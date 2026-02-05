@@ -1,0 +1,571 @@
+/* Global Styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 100%);
+    color: #ffffff;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+    flex: 1;
+}
+
+/* Header */
+header {
+    background: rgba(0, 0, 0, 0.8);
+    padding: 1rem 0;
+    border-bottom: 1px solid #00d4ff;
+}
+
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 20px;
+}
+
+.logo {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #00d4ff;
+}
+
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.settings-icon {
+    cursor: pointer;
+    font-size: 1.2rem;
+}
+
+/* Buttons */
+.btn {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    display: inline-block;
+    text-align: center;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #00d4ff 0%, #0099cc 100%);
+    color: #ffffff;
+    box-shadow: 0 4px 15px rgba(0, 212, 255, 0.3);
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 212, 255, 0.4);
+}
+
+.btn-secondary {
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+    border: 1px solid #00d4ff;
+}
+
+.btn-secondary:hover {
+    background: rgba(0, 212, 255, 0.1);
+}
+
+.btn-danger {
+    background: linear-gradient(135deg, #ff4757 0%, #ff3838 100%);
+    color: #ffffff;
+}
+
+.btn-success {
+    background: linear-gradient(135deg, #2ed573 0%, #1e90ff 100%);
+    color: #ffffff;
+}
+
+/* Forms */
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: #00d4ff;
+}
+
+input[type="text"],
+input[type="password"],
+input[type="email"] {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #00d4ff;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+    font-size: 1rem;
+}
+
+input[type="text"]:focus,
+input[type="password"]:focus,
+input[type="email"]:focus {
+    outline: none;
+    border-color: #00d4ff;
+    box-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
+}
+
+/* Cards */
+.card {
+    background: rgba(0, 0, 0, 0.5);
+    border: 1px solid #00d4ff;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+    backdrop-filter: blur(10px);
+}
+
+.card h3 {
+    color: #00d4ff;
+    margin-bottom: 1rem;
+}
+
+/* Friend List */
+.friend-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 20px;
+}
+
+.friend-card {
+    background: rgba(0, 0, 0, 0.5);
+    border: 1px solid #00d4ff;
+    border-radius: 12px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+.friend-card .name {
+    font-size: 1.2rem;
+    margin-bottom: 0.5rem;
+}
+
+.status {
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: bold;
+}
+
+.status.online {
+    background: #2ed573;
+    color: #ffffff;
+}
+
+.status.offline {
+    background: #ff4757;
+    color: #ffffff;
+}
+
+.friend-card .btn {
+    margin-top: 10px;
+    width: 100%;
+}
+
+/* Call Screens */
+.call-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 80vh;
+}
+
+.call-screen h2 {
+    font-size: 2rem;
+    margin-bottom: 2rem;
+    color: #00d4ff;
+}
+
+.call-buttons {
+    display: flex;
+    gap: 20px;
+}
+
+.call-buttons .btn {
+    padding: 20px 40px;
+    font-size: 1.2rem;
+}
+
+/* In-Call UI */
+.in-call {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+.video-section {
+    flex: 1;
+    position: relative;
+    background: #000;
+}
+
+.main-video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.self-video {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    width: 200px;
+    height: 150px;
+    border: 2px solid #00d4ff;
+    border-radius: 8px;
+}
+
+.interpretation-panel {
+    background: rgba(0, 0, 0, 0.8);
+    padding: 20px;
+    border-top: 1px solid #00d4ff;
+}
+
+.interpretation-text {
+    font-size: 1.5rem;
+    color: #00d4ff;
+    margin-bottom: 1rem;
+}
+
+.controls {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    padding: 20px;
+    background: rgba(0, 0, 0, 0.8);
+}
+
+.control-btn {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid #00d4ff;
+    color: #ffffff;
+    padding: 15px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 1.2rem;
+    transition: all 0.3s ease;
+}
+
+.control-btn:hover {
+    background: rgba(0, 212, 255, 0.2);
+}
+
+.control-btn.active {
+    background: #00d4ff;
+    color: #000;
+}
+
+/* Settings */
+.settings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+.setting-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+}
+
+.toggle {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 24px;
+}
+
+.toggle input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: .4s;
+    border-radius: 24px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+
+input:checked + .slider {
+    background-color: #00d4ff;
+}
+
+input:checked + .slider:before {
+    transform: translateX(26px);
+}
+
+/* Welcome Screen */
+.welcome {
+    text-align: center;
+    padding: 4rem 2rem;
+}
+
+.welcome h1 {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    background: linear-gradient(135deg, #00d4ff 0%, #0099cc 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.welcome p {
+    font-size: 1.2rem;
+    margin-bottom: 2rem;
+    color: #cccccc;
+}
+
+.welcome-buttons {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .header-content {
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .friend-list {
+        grid-template-columns: 1fr;
+    }
+
+    .call-buttons {
+        flex-direction: column;
+    }
+
+    .controls {
+        flex-wrap: wrap;
+    }
+
+    .settings-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .call-container {
+        padding: 10px;
+    }
+
+    .video-area {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .remote-video-container,
+    .local-video-container {
+        height: 40vh;
+    }
+
+    .call-controls {
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+}
+
+/* Enhanced Video Call Styles */
+.call-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 100%);
+    overflow: hidden;
+}
+
+.call-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    background: rgba(0, 0, 0, 0.8);
+    border-bottom: 1px solid #00d4ff;
+    backdrop-filter: blur(10px);
+}
+
+.call-info h2 {
+    color: #00d4ff;
+    margin-bottom: 5px;
+}
+
+.call-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9rem;
+    color: #cccccc;
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.status-dot.connected {
+    background: #2ed573;
+    box-shadow: 0 0 10px rgba(46, 213, 115, 0.5);
+}
+
+.call-controls {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+}
+
+.control-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid #00d4ff;
+    border-radius: 25px;
+    color: #ffffff;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 0.9rem;
+}
+
+.control-btn:hover {
+    background: rgba(0, 212, 255, 0.2);
+    transform: translateY(-1px);
+}
+
+.control-btn.active {
+    background: #00d4ff;
+    color: #000;
+}
+
+.control-btn.end-call {
+    background: linear-gradient(135deg, #ff4757 0%, #ff3838 100%);
+    border: none;
+    font-weight: 600;
+}
+
+.control-btn.end-call:hover {
+    background: linear-gradient(135deg, #ff3838 0%, #ff2828 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 15px rgba(255, 71, 87, 0.4);
+}
+
+.video-area {
+    flex: 1;
+    display: flex;
+    gap: 20px;
+    padding: 20px;
+    position: relative;
+}
+
+.remote-video-container,
+.local-video-container {
+    flex: 1;
+    position: relative;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #000;
+    border: 2px solid #00d4ff;
+    box-shadow: 0 8px 32px rgba(0, 212, 255, 0.3);
+}
+
+.remote-video-container {
+    flex: 2;
+}
+
+#remote-video,
+#local-video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 10px;
+}
+
+.participant-info {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
+    padding: 20px;
+    color: #ffffff;
+}
+
+.participant-name {
+    font-weight: 600;
+    margin-bottom: 5px;
+    color: #00d4ff;
+}
+
+.asl-output {
+    font-size: 1.1rem;
+    color: #ffffff;
+    background: rgba(0, 212, 255, 0.1);
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid rgba(0, 212, 255, 0.3);
+}
+
+.call-duration {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.8);
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-weight: 600;
+    color: #00d4ff;
+    border: 1px solid #00d4ff;
+    backdrop-filter: blur(10px);
+}
