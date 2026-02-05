@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SignFlow - Create Account</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="login-container">
+        <div class="animated-bg">
+            <div class="aurora-layer"></div>
+            <div class="grid-layer"></div>
+            <div class="floating-shapes">
+                <div class="shape shape-1"></div>
+                <div class="shape shape-2"></div>
+                <div class="shape shape-3"></div>
+                <div class="shape shape-4"></div>
+            </div>
+            <div class="signal-orbit">
+                <span class="orbit-dot"></span>
+                <span class="orbit-dot"></span>
+                <span class="orbit-dot"></span>
+            </div>
+        </div>
+
+        <div class="login-content">
+            <div class="brand-section">
+                <div class="logo-container">
+                    <i class="fas fa-sign-language"></i>
+                    <h1 class="brand-name">SignFlow</h1>
+                </div>
+                <p class="brand-tagline">Create your SignFlow account</p>
+                <div class="brand-features">
+                    <div class="feature-item">
+                        <i class="fas fa-bolt"></i>
+                        <span>Fast ASL Recognition</span>
+                    </div>
+                    <div class="feature-item">
+                        <i class="fas fa-shield"></i>
+                        <span>Secure Password Hashing</span>
+                    </div>
+                    <div class="feature-item">
+                        <i class="fas fa-cloud"></i>
+                        <span>Saved Sessions</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="login-form-container">
+                <div class="form-header">
+                    <h2>Create Account</h2>
+                    <p>Use your email, username, and password to sign up</p>
+                </div>
+
+                <form id="signup-form" class="login-form">
+                    <div class="form-group">
+                        <label for="email">
+                            <i class="fas fa-envelope"></i>
+                            Email
+                        </label>
+                        <input type="email" id="email" name="email" required placeholder="Enter your email">
+                        <div class="input-line"></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="username">
+                            <i class="fas fa-user"></i>
+                            Username
+                        </label>
+                        <input type="text" id="username" name="username" required placeholder="Choose a username">
+                        <div class="input-line"></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="password">
+                            <i class="fas fa-lock"></i>
+                            Password
+                        </label>
+                        <div class="input-wrap">
+                            <input type="password" id="password" name="password" required placeholder="Create a password">
+                            <button type="button" class="toggle-password" id="toggle-password" aria-label="Show password">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                        <div class="input-line"></div>
+                    </div>
+
+                    <button type="submit" class="login-btn">
+                        <span class="btn-text">Create Account</span>
+                        <i class="fas fa-user-plus"></i>
+                    </button>
+                </form>
+
+                <div class="login-hint" id="signup-hint" aria-live="polite"></div>
+
+                <div class="signup-prompt">
+                    <p>Already have an account?
+                        <a href="/" id="login-link">Sign in</a>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const signupForm = document.getElementById('signup-form');
+        const togglePasswordBtn = document.getElementById('toggle-password');
+        const passwordInput = document.getElementById('password');
+        const signupHint = document.getElementById('signup-hint');
+
+        signupForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            signupHint.textContent = '';
+            signupHint.classList.remove('show');
+
+            const email = document.getElementById('email').value.trim();
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+
+            if (!email || !username || !password) {
+                signupHint.textContent = 'Please fill out all fields.';
+                signupHint.classList.add('show');
+                return;
+            }
+
+            try {
+                const res = await fetch('/signup', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, username, password })
+                });
+                const isJson = res.headers.get('content-type')?.includes('application/json');
+                const data = isJson ? await res.json() : { detail: await res.text() };
+                if (!res.ok) throw new Error(data.detail || 'Signup failed');
+                signupHint.textContent = `Account created. Your user id is ${data.user_id}. Redirecting...`;
+                signupHint.classList.add('show');
+                setTimeout(() => window.location.href = '/call', 500);
+            } catch (err) {
+                signupHint.textContent = err.message || 'Signup failed';
+                signupHint.classList.add('show');
+            }
+        });
+
+        togglePasswordBtn.addEventListener('click', () => {
+            const isPassword = passwordInput.type === 'password';
+            passwordInput.type = isPassword ? 'text' : 'password';
+            togglePasswordBtn.innerHTML = isPassword ? '<i class="fas fa-eye-slash"></i>' : '<i class="fas fa-eye"></i>';
+        });
+    </script>
+</body>
+</html>

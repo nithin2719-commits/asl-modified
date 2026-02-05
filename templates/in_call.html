@@ -5,34 +5,39 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SignFlow - ASL Video Call</title>
     <link rel="stylesheet" href="/static/css/style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
 <body>
     <div class="call-container">
-        <!-- Header -->
+        <!-- Enhanced Header with SignFlow Branding -->
         <div class="call-header">
-            <div class="call-info">
-                <h2>ASL Video Call</h2>
-                <div class="call-status">
-                    <span class="status-dot connected"></span>
-                    <span>Connected</span>
+            <div class="brand-info">
+                <div class="brand-logo">
+                    <i class="fas fa-sign-language"></i>
+                    <span class="brand-name">SignFlow</span>
+                </div>
+                <div class="call-info">
+                    <h2>ASL Video Call</h2>
+                    <div class="call-status">
+                        <span class="status-dot connected"></span>
+                        <span>Connected</span>
+                    </div>
                 </div>
             </div>
             <div class="call-controls">
-                <button class="control-btn" id="mute-btn">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M12 2C13.1 2 14 2.9 14 4V20C14 21.1 13.1 22 12 22S10 21.1 10 20V4C10 2.9 10.9 2 12 2ZM16.5 12C16.5 10.23 17.5 8.71 19 7.97V16.02C17.5 15.29 16.5 13.77 16.5 12ZM19 4V2.5C19 1.67 19.67 1 20.5 1S22 1.67 22 2.5V4C22 4.83 21.33 5.5 20.5 5.5S19 4.83 19 4ZM19 19.5V21C19 21.83 19.67 22 20.5 22S22 21.83 22 21V19.5C22 18.67 21.33 18 20.5 18S19 18.67 19 19.5Z"/>
-                    </svg>
+                <button class="control-btn" id="logout-btn" title="Logout">
+                    <i class="fas fa-right-from-bracket"></i>
+                    <span>Logout</span>
                 </button>
-                <button class="control-btn" id="video-btn">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M17 10.5V7C17 6.45 16.55 6 16 6H4C3.45 6 3 6.45 3 7V17C3 17.55 3.45 18 4 18H16C16.55 18 17 17.55 17 17V13.5L21 17.5V6.5L17 10.5Z"/>
-                    </svg>
+                <button class="control-btn" id="mute-btn" title="Toggle Microphone">
+                    <i class="fas fa-microphone"></i>
                 </button>
-                <button class="control-btn end-call" id="end-call-btn">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M12 9C10.9 9 10 8.1 10 7S10.9 5 12 5 14 5.9 14 7 13.1 9 12 9ZM12 11C13.66 11 15 12.34 15 14V17H9V14C9 12.34 10.34 11 12 11Z"/>
-                    </svg>
-                    End Call
+                <button class="control-btn" id="video-btn" title="Toggle Camera">
+                    <i class="fas fa-video"></i>
+                </button>
+                <button class="control-btn end-call" id="end-call-btn" title="End Call">
+                    <i class="fas fa-phone-slash"></i>
+                    <span>End Call</span>
                 </button>
             </div>
         </div>
@@ -45,6 +50,7 @@
                 <div class="participant-info">
                     <div class="participant-name">ASL Interpreter</div>
                     <div class="asl-output" id="asl-output">Ready for ASL detection...</div>
+                    <div class="asl-sentence" id="asl-sentence">Sentence: </div>
                 </div>
             </div>
 
@@ -58,11 +64,24 @@
         </div>
 
         <!-- ASL Detection Canvas (Hidden) -->
-        <canvas id="canvas" width="640" height="480" style="display:none;"></canvas>
+        <canvas id="canvas" width="320" height="240" style="display:none;"></canvas>
 
         <!-- Call Duration -->
         <div class="call-duration">
             <span id="call-timer">00:00:00</span>
+        </div>
+
+        <!-- Camera Permission Prompt -->
+        <div id="camera-prompt" class="camera-prompt">
+            <div class="prompt-content">
+                <h3>Camera Access Required</h3>
+                <p>This app needs camera access to detect ASL signs.</p>
+                <button id="start-camera-btn" class="btn-primary">Allow Camera Access</button>
+                <p class="permission-help">
+                    Click "Allow" when your browser asks for camera permissions.<br>
+                    If blocked, click the camera icon in your browser's address bar.
+                </p>
+            </div>
         </div>
     </div>
 
@@ -72,15 +91,21 @@
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
         const aslOutput = document.getElementById('asl-output');
+        const aslSentence = document.getElementById('asl-sentence');
         const callTimer = document.getElementById('call-timer');
         const muteBtn = document.getElementById('mute-btn');
         const videoBtn = document.getElementById('video-btn');
         const endCallBtn = document.getElementById('end-call-btn');
+        const logoutBtn = document.getElementById('logout-btn');
+        const cameraPrompt = document.getElementById('camera-prompt');
+        const startCameraBtn = document.getElementById('start-camera-btn');
+        const mirrorCanvas = true;
 
         let callStartTime = Date.now();
         let timerInterval;
         let isMuted = false;
         let isVideoOff = false;
+        localVideo.classList.toggle('mirrored', mirrorCanvas);
 
         // Start call timer
         function startTimer() {
@@ -96,31 +121,72 @@
         // Initialize camera
         async function initCamera() {
             try {
+                // Check if camera permission is already granted
+                const permissionStatus = await navigator.permissions.query({ name: 'camera' });
+                console.log('Camera permission status:', permissionStatus.state);
+
                 const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { width: 640, height: 480 },
+                    video: { width: 640, height: 480, facingMode: 'user' },
                     audio: true
                 });
+
                 localVideo.srcObject = stream;
+                cameraPrompt.style.display = 'none';
                 startTimer();
                 startASLDetection();
+
+                // Show success message
+                aslOutput.textContent = 'Camera connected! Ready for ASL detection.';
+                setTimeout(() => {
+                    aslOutput.textContent = 'Ready for ASL detection...';
+                }, 2000);
+
             } catch (error) {
                 console.error('Error accessing camera:', error);
-                aslOutput.textContent = 'Camera access denied. Please allow camera permissions.';
+
+                let errorMessage = 'Camera access failed. ';
+                if (error.name === 'NotAllowedError') {
+                    errorMessage += 'Please click "Allow" when prompted, or enable camera in browser settings.';
+                } else if (error.name === 'NotFoundError') {
+                    errorMessage += 'No camera found. Please connect a camera and refresh.';
+                } else if (error.name === 'NotReadableError') {
+                    errorMessage += 'Camera is already in use by another application.';
+                } else {
+                    errorMessage += 'Please check camera permissions and try again.';
+                }
+
+                aslOutput.textContent = errorMessage;
+                cameraPrompt.style.display = 'flex';
             }
         }
+
+        // Manual camera start button
+        startCameraBtn.addEventListener('click', () => {
+            aslOutput.textContent = 'Requesting camera access...';
+            initCamera();
+        });
 
         // ASL Detection
         async function startASLDetection() {
             const stream = localVideo.srcObject;
             if (!stream) return;
 
+            let inFlight = false;
             const interval = setInterval(async () => {
+                if (inFlight) return;
                 if (localVideo.videoWidth === 0) return;
 
+                ctx.save();
+                if (mirrorCanvas) {
+                    ctx.translate(canvas.width, 0);
+                    ctx.scale(-1, 1);
+                }
                 ctx.drawImage(localVideo, 0, 0, canvas.width, canvas.height);
-                const imageData = canvas.toDataURL('image/png');
+                ctx.restore();
+                const imageData = canvas.toDataURL('image/jpeg', 0.5);
 
                 try {
+                    inFlight = true;
                     const response = await fetch('/predict', {
                         method: 'POST',
                         headers: {
@@ -133,10 +199,15 @@
                     if (result.letter) {
                         aslOutput.textContent = `Detected: ${result.letter}`;
                     }
+                    if (typeof result.sentence === 'string') {
+                        aslSentence.textContent = `Sentence: ${result.sentence}`;
+                    }
                 } catch (error) {
                     console.error('Error detecting ASL:', error);
+                } finally {
+                    inFlight = false;
                 }
-            }, 1000); // Check every second
+            }, 200); // Faster detection
         }
 
         // Control buttons
@@ -168,8 +239,20 @@
             window.location.href = '/';
         });
 
-        // Initialize on page load
-        window.addEventListener('load', initCamera);
+        logoutBtn.addEventListener('click', async () => {
+            try {
+                await fetch('/logout', { method: 'POST' });
+            } catch (e) {
+                console.error('Logout failed', e);
+            }
+            window.location.href = '/';
+        });
+
+        // Initialize on page load - show camera prompt instead of auto-starting
+        window.addEventListener('load', () => {
+            cameraPrompt.style.display = 'flex';
+            aslOutput.textContent = 'Click "Allow Camera Access" to start ASL recognition.';
+        });
     </script>
 </body>
 </html>

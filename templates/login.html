@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SignFlow - ASL Recognition Platform</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="login-container">
+        <!-- Animated Background -->
+        <div class="animated-bg">
+            <div class="aurora-layer"></div>
+            <div class="grid-layer"></div>
+            <div class="floating-shapes">
+                <div class="shape shape-1"></div>
+                <div class="shape shape-2"></div>
+                <div class="shape shape-3"></div>
+                <div class="shape shape-4"></div>
+            </div>
+            <div class="signal-orbit">
+                <span class="orbit-dot"></span>
+                <span class="orbit-dot"></span>
+                <span class="orbit-dot"></span>
+            </div>
+        </div>
+
+        <!-- Main Login Content -->
+        <div class="login-content">
+            <!-- Logo and Branding -->
+            <div class="brand-section">
+                <div class="logo-container">
+                    <i class="fas fa-sign-language"></i>
+                    <h1 class="brand-name">SignFlow</h1>
+                </div>
+                <p class="brand-tagline">Bridging Communication Through ASL</p>
+                <div class="brand-features">
+                    <div class="feature-item">
+                        <i class="fas fa-video"></i>
+                        <span>Real-time ASL Recognition</span>
+                    </div>
+                    <div class="feature-item">
+                        <i class="fas fa-users"></i>
+                        <span>Video Calling Interface</span>
+                    </div>
+                    <div class="feature-item">
+                        <i class="fas fa-brain"></i>
+                        <span>AI-Powered Detection</span>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Login Form -->
+            <div class="login-form-container">
+                <div class="form-header">
+                    <h2>Welcome Back</h2>
+                    <p>Sign in to start your ASL conversation</p>
+                </div>
+
+                <form id="login-form" class="login-form">
+                    <div class="form-group">
+                        <label for="username">
+                            <i class="fas fa-user"></i>
+                            Username
+                        </label>
+                        <input type="text" id="username" name="username" required placeholder="Enter your username">
+                        <div class="input-line"></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="password">
+                            <i class="fas fa-lock"></i>
+                            Password
+                        </label>
+                        <div class="input-wrap">
+                            <input type="password" id="password" name="password" required placeholder="Enter your password">
+                            <button type="button" class="toggle-password" id="toggle-password" aria-label="Show password">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                        <div class="input-line"></div>
+                    </div>
+
+                    <div class="form-options">
+                        <label class="checkbox-container">
+                            <input type="checkbox" id="remember">
+                            <span class="checkmark"></span>
+                            Remember me
+                        </label>
+                        <a href="#" class="forgot-password">Forgot Password?</a>
+                    </div>
+
+                    <button type="submit" class="login-btn">
+                        <span class="btn-text">Sign In</span>
+                        <i class="fas fa-arrow-right"></i>
+                    </button>
+
+                    <button type="button" class="signup-btn" id="signup-btn">
+                        <span class="btn-text">Create Account</span>
+                        <i class="fas fa-user-plus"></i>
+                    </button>
+
+                </form>
+
+                <div class="login-hint" id="login-hint" aria-live="polite"></div>
+
+                <div class="divider">
+                    <span>or</span>
+                </div>
+
+                <div class="social-login">
+                    <button class="social-btn google-btn">
+                        <i class="fab fa-google"></i>
+                        Continue with Google
+                    </button>
+                    <button class="social-btn github-btn">
+                        <i class="fab fa-github"></i>
+                        Continue with GitHub
+                    </button>
+                </div>
+
+                <div class="signup-prompt">
+                    <p>Don't have an account?
+                        <a href="/signup" id="signup-link">Create one now</a>
+                    </p>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // Form handling
+        const loginForm = document.getElementById('login-form');
+        const signupLink = document.getElementById('signup-link');
+        const signupBtn = document.getElementById('signup-btn');
+        const togglePasswordBtn = document.getElementById('toggle-password');
+        const passwordInput = document.getElementById('password');
+        const loginHint = document.getElementById('login-hint');
+
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            loginHint.textContent = '';
+            loginHint.classList.remove('show');
+
+            if (username && password) {
+                // Show loading state
+                const btn = loginForm.querySelector('.login-btn');
+                const btnText = btn.querySelector('.btn-text');
+                btnText.textContent = 'Signing in...';
+                btn.disabled = true;
+
+                try {
+                    const response = await fetch('/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ username, password })
+                    });
+                    const isJson = response.headers.get('content-type')?.includes('application/json');
+                    const result = isJson ? await response.json() : { detail: await response.text() };
+                    if (!response.ok) {
+                        throw new Error(result.detail || 'Login failed');
+                    }
+                    if (result.created) {
+                        loginHint.textContent = 'Account created automatically. Signing you in...';
+                        loginHint.classList.add('show');
+                    }
+                    window.location.href = '/call';
+                } catch (err) {
+                    loginHint.textContent = err.message || 'Login failed. Please try again.';
+                    loginHint.classList.add('show');
+                } finally {
+                    btnText.textContent = 'Sign In';
+                    btn.disabled = false;
+                }
+            } else {
+                loginHint.textContent = 'Please enter a username and password to continue.';
+                loginHint.classList.add('show');
+                loginForm.classList.add('shake');
+                setTimeout(() => loginForm.classList.remove('shake'), 400);
+            }
+        });
+
+        signupLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            window.location.href = '/signup';
+        });
+
+        signupBtn.addEventListener('click', () => {
+            window.location.href = '/signup';
+        });
+
+        togglePasswordBtn.addEventListener('click', () => {
+            const isPassword = passwordInput.type === 'password';
+            passwordInput.type = isPassword ? 'text' : 'password';
+            togglePasswordBtn.innerHTML = isPassword ? '<i class="fas fa-eye-slash"></i>' : '<i class="fas fa-eye"></i>';
+        });
+
+        // Animated background effects
+        document.addEventListener('mousemove', (e) => {
+            const shapes = document.querySelectorAll('.shape');
+            shapes.forEach((shape, index) => {
+                const speed = (index + 1) * 0.5;
+                const x = (window.innerWidth - e.pageX * speed) / 100;
+                const y = (window.innerHeight - e.pageY * speed) / 100;
+                shape.style.transform = `translateX(${x}px) translateY(${y}px)`;
+            });
+        });
+
+        // Input focus effects
+        const inputs = document.querySelectorAll('input');
+        inputs.forEach(input => {
+            input.addEventListener('focus', () => {
+                input.parentElement.classList.add('focused');
+            });
+
+            input.addEventListener('blur', () => {
+                if (!input.value) {
+                    input.parentElement.classList.remove('focused');
+                }
+            });
+        });
+
+    </script>
+</body>
+</html>
