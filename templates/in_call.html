@@ -221,17 +221,17 @@
                     });
 
                     const result = await response.json();
-                    if (result.letter) {
-                        aslOutput.textContent = `Detected: ${result.letter}`;
-                    }
-                    if (typeof result.sentence === 'string') {
-                        aslSentence.textContent = `Sentence: ${result.sentence}`;
-                    }
-                } catch (error) {
-                    console.error('Error detecting ASL:', error);
-                } finally {
-                    inFlight = false;
+                if (result.letter) {
+                    aslOutput.textContent = `Detected: ${result.letter}`;
                 }
+                if (typeof result.sentence === 'string') {
+                    aslSentence.textContent = `Sentence: ${result.sentence}`;
+                }
+            } catch (error) {
+                console.error('Error detecting ASL:', error);
+            } finally {
+                inFlight = false;
+            }
             }, 200); // Faster detection
         }
 
@@ -352,6 +352,27 @@
                 sendSignal({ type: 'offer', sdp: offer });
             }
             pollSignals();
+            if (ROLE === 'secondary') {
+                pollDetection();
+            }
+        }
+
+        // Secondary polls the server for latest detected letter/sentence from primary
+        async function pollDetection() {
+            try {
+                const res = await fetch('/live_result');
+                const data = await res.json();
+                if (data.letter) {
+                    aslOutput.textContent = `Detected: ${data.letter}`;
+                }
+                if (data.sentence !== undefined) {
+                    aslSentence.textContent = `Sentence: ${data.sentence}`;
+                }
+            } catch (e) {
+                console.error('pollDetection failed', e);
+            } finally {
+                setTimeout(pollDetection, 400);
+            }
         }
 
         async function sendSignal(payload) {

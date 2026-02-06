@@ -246,6 +246,9 @@ prev_char = ""
 count = -1
 ten_prev_char = [" "] * 10
 
+# Shared last detection result for secondary display
+last_result = {"letter": "", "sentence": "", "ts": 0}
+
 def distance(x, y):
     return math.sqrt(((x[0] - y[0]) ** 2) + ((x[1] - y[1]) ** 2))
 
@@ -660,6 +663,9 @@ def predict(test_image, pts):
         ch1 = "Backspace"
 
     _update_sentence(ch1)
+    # update shared result
+    global last_result
+    last_result = {"letter": ch1, "sentence": sentence, "ts": int(time.time() * 1000)}
     return ch1
 
 @app.post("/predict")
@@ -668,6 +674,7 @@ async def predict_endpoint(data: dict, request: Request):
     user = _get_user_from_session(token)
     if not user:
         raise HTTPException(status_code=401, detail="Not authenticated.")
+    username = user[1]
     image_data = data['image']
     # Remove the data URL prefix
     header, encoded = image_data.split(",", 1)
@@ -719,7 +726,11 @@ async def predict_endpoint(data: dict, request: Request):
                         for i in range(21):
                             cv2.circle(white, (pts[i][0] + os, pts[i][1] + os1), 2, (0, 0, 255), 1)
                         res = white
-                        letter = predict(res, pts)
+                        # Only run prediction/update if this is the primary user
+                        if username.lower() == "primary":
+                            letter = predict(res, pts)
+                        else:
+                            letter = ""
                         print("Recognized letter:", letter)
     return {"letter": letter, "sentence": sentence}
 
@@ -838,3 +849,9 @@ async def logout(request: Request, response: Response):
         conn.close()
     response.delete_cookie("session")
     return {"ok": True}
+
+
+@app.get("/live_result")
+async def live_result(role: str = ""):
+    # Secondary polls this to display current letter/sentence
+    return last_result
