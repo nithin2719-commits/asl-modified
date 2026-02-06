@@ -51,10 +51,10 @@
                 <!-- Meet-like framed Video Canvas -->
                 <div class="remote-video-container">
                     <div class="interpreter-badge"><i class="fas fa-brain"></i> ASL Interpreter</div>
-                    <video id="remote-video" autoplay muted></video>
+                    <video id="remote-peer" autoplay playsinline></video>
                     <!-- Local PIP -->
                     <div class="local-video-bubble">
-                        <video id="local-video" autoplay muted></video>
+                        <video id="local-video" autoplay muted playsinline></video>
                         <div class="participant-name">You</div>
                     </div>
                     <div class="participant-info">
@@ -90,7 +90,9 @@
 
     <script>
         const localVideo = document.getElementById('local-video');
-        const remoteVideo = document.getElementById('remote-video');
+        const remotePeerVideo = document.getElementById('remote-peer');
+        remotePeerVideo.muted = true; // allow autoplay without user gesture
+        remotePeerVideo.playsInline = true;
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
         const aslOutput = document.getElementById('asl-output');
@@ -107,6 +109,7 @@
         const cameraPrompt = document.getElementById('camera-prompt');
         const startCameraBtn = document.getElementById('start-camera-btn');
         const mirrorCanvas = true;
+        const ROLE = "{{ username|default('')|lower }}";
         const controlPills = document.querySelectorAll('.control-pill');
 
         let callStartTime = Date.now();
@@ -148,10 +151,14 @@
                 });
 
                 localVideo.srcObject = stream;
-                remoteVideo.srcObject = stream;
                 cameraPrompt.style.display = 'none';
                 startTimer();
-                startASLDetection();
+                startSignaling(stream);
+                if (ROLE === 'primary') {
+                    startASLDetection();
+                } else {
+                    aslOutput.textContent = 'Viewer mode: ASL prediction off.';
+                }
 
                 // Show success message
                 aslOutput.textContent = 'Camera connected! Ready for ASL detection.';
@@ -277,6 +284,121 @@
             cameraPrompt.style.display = 'flex';
             aslOutput.textContent = 'Click "Allow Camera Access" to start ASL recognition.';
         });
+
+        // ------------------ WebRTC Signaling ------------------
+        let pc = null;
+        let remoteStream = null;
+
+        async function startSignaling(stream) {
+            if (!ROLE || (ROLE !== 'primary' && ROLE !== 'secondary')) {
+                alert('Unknown role. Only primary/secondary allowed.');
+                return;
+            }
+
+            pc = new RTCPeerConnection({
+                iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' },
+                    // Public TURN for testing; replace with your own for reliability
+                    {
+                        urls: [
+                            'turn:openrelay.metered.ca:80',
+                            'turn:openrelay.metered.ca:443',
+                            'turn:openrelay.metered.ca:443?transport=tcp'
+                        ],
+                        username: 'openrelayproject',
+                        credential: 'openrelayproject'
+                    }
+                ],
+                iceTransportPolicy: 'all'
+            });
+
+            pc.addEventListener('connectionstatechange', () => {
+                console.log('PC state', pc.connectionState);
+                if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
+                    aslOutput.textContent = 'Connection lost. Reload to retry.';
+                    try { pc.restartIce(); } catch (e) { console.warn('restartIce failed', e); }
+                }
+            });
+
+            // Send local tracks
+            stream.getTracks().forEach(track => pc.addTrack(track, stream));
+
+            // Remote track handler
+            pc.addEventListener('track', (event) => {
+                if (!remoteStream) {
+                    remoteStream = new MediaStream();
+                    remotePeerVideo.srcObject = remoteStream;
+                }
+                if (event.track) {
+                    remoteStream.addTrack(event.track);
+                }
+                if (remotePeerVideo.paused) {
+                    remotePeerVideo.play().catch(() => {});
+                }
+            });
+
+            // ICE candidate handler (HTTP signaling)
+            pc.addEventListener('icecandidate', (event) => {
+                if (event.candidate) {
+                    sendSignal({ type: 'candidate', candidate: event.candidate });
+                }
+            });
+
+            // Offer/Answer flow over HTTP polling
+            if (ROLE === 'secondary') {
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                sendSignal({ type: 'offer', sdp: offer });
+            }
+            pollSignals();
+        }
+
+        async function sendSignal(payload) {
+            try {
+                await fetch('/signal/send', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ role: ROLE, data: payload })
+                });
+            } catch (e) {
+                console.error('sendSignal failed', e);
+            }
+        }
+
+        async function pollSignals() {
+            try {
+                const res = await fetch(`/signal/recv?role=${ROLE}`);
+                const { messages } = await res.json();
+                for (const msg of messages) {
+                    await handleSignal(msg);
+                }
+            } catch (e) {
+                console.error('pollSignals failed', e);
+            } finally {
+                setTimeout(pollSignals, 500); // poll every 500ms
+            }
+        }
+
+        async function handleSignal(data) {
+            if (!pc) return;
+            if (data.type === 'offer' && ROLE === 'primary') {
+                await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
+                const answer = await pc.createAnswer();
+                await pc.setLocalDescription(answer);
+                sendSignal({ type: 'answer', sdp: answer });
+            } else if (data.type === 'answer' && ROLE === 'secondary') {
+                await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
+            } else if (data.type === 'candidate') {
+                if (data.candidate) {
+                    try {
+                        await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+                    } catch (err) {
+                        console.error('addIceCandidate failed', err);
+                    }
+                }
+            }
+        }
     </script>
 </body>
 </html>

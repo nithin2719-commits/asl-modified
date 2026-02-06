@@ -2,8 +2,9 @@ import os
 os.environ.setdefault("PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION", "python")
 os.environ.setdefault("PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION_VERSION", "3")
 
-from fastapi import FastAPI, Request, Response, HTTPException
+from fastapi import FastAPI, Request, Response, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
@@ -18,12 +19,17 @@ import secrets
 import hashlib
 import hmac
 import time
+from typing import Dict, Optional
 
 app = FastAPI()
 
 # Configure templates and static files
 templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+@app.get("/favicon.ico")
+async def favicon():
+    return Response(status_code=204)
 
 # Add CORS middleware
 app.add_middleware(
@@ -86,6 +92,28 @@ def _verify_password(password: str, salt: str, stored_hash: str) -> bool:
     test_hash = _hash_password(password, salt)
     return hmac.compare_digest(test_hash, stored_hash)
 
+DEFAULT_ACCOUNTS = [
+    {"username": "primary", "email": "primary@example.com", "password": "primary123"},
+    {"username": "secondary", "email": "secondary@example.com", "password": "secondary123"},
+]
+
+def _seed_default_users():
+    """Ensure the primary/secondary hardcoded users exist."""
+    conn = _db()
+    cur = conn.cursor()
+    for acct in DEFAULT_ACCOUNTS:
+        cur.execute("SELECT id FROM users WHERE username = ?", (acct["username"],))
+        if cur.fetchone():
+            continue
+        salt = secrets.token_hex(16)
+        pw_hash = _hash_password(acct["password"], salt)
+        cur.execute(
+            "INSERT INTO users (username, email, password_hash, salt, created_at) VALUES (?, ?, ?, ?, ?)",
+            (acct["username"], acct["email"], pw_hash, salt, int(time.time())),
+        )
+    conn.commit()
+    conn.close()
+
 def _is_password_unique(password: str) -> bool:
     conn = _db()
     cur = conn.cursor()
@@ -119,6 +147,93 @@ def _get_user_from_session(token: str):
     return user
 
 _init_db()
+_seed_default_users()
+
+# Simple in-memory signaling slots for a single primary-secondary pair
+signals: Dict[str, Optional[WebSocket]] = {"primary": None, "secondary": None}
+pending: Dict[str, list] = {"primary": [], "secondary": []}  # messages queued for this role
+http_signal_queue: Dict[str, list] = {"primary": [], "secondary": []}  # for HTTP polling signaling
+
+
+def _get_peer(role: str) -> Optional[WebSocket]:
+    other = "secondary" if role == "primary" else "primary"
+    return signals.get(other)
+
+
+@app.websocket("/ws/signaling")
+async def websocket_signaling(ws: WebSocket):
+    await ws.accept()
+    try:
+        # Expect first message to declare role
+        role_msg = await ws.receive_text()
+        role = role_msg.strip().lower()
+        if role not in ("primary", "secondary"):
+            await ws.send_text("error:invalid-role")
+            await ws.close(code=1008)
+            return
+        # Replace any existing connection for this role
+        if signals[role]:
+            try:
+                await signals[role].close(code=1011)
+            except Exception:
+                pass
+        signals[role] = ws
+        await ws.send_text("ack:{}".format(role))
+
+        # Flush any pending messages that were queued while peer was absent
+        # Deliver any messages queued for this role
+        for msg in pending[role]:
+            try:
+                await ws.send_text(msg)
+            except Exception:
+                pass
+        pending[role].clear()
+
+        # Relay loop
+        while True:
+            data = await ws.receive_text()
+            peer = _get_peer(role)
+            if peer:
+                try:
+                    await peer.send_text(data)
+                except Exception:
+                    pass
+            else:
+                # queue for the peer to receive when it connects
+                other = "secondary" if role == "primary" else "primary"
+                pending[other].append(data)
+    except WebSocketDisconnect:
+        pass
+    finally:
+        # cleanup on disconnect
+        for r, sock in signals.items():
+            if sock is ws:
+                signals[r] = None
+
+
+# ----------------- HTTP polling signaling (fallback when websockets not available) -----------------
+from fastapi import Body
+
+def _other(role: str) -> str:
+    return "secondary" if role == "primary" else "primary"
+
+@app.post("/signal/send")
+async def signal_send(payload: dict = Body(...)):
+    role = payload.get("role", "").lower()
+    data = payload.get("data")
+    if role not in ("primary", "secondary"):
+        raise HTTPException(status_code=400, detail="invalid role")
+    http_signal_queue[_other(role)].append(data)
+    return {"ok": True}
+
+@app.get("/signal/recv")
+async def signal_recv(role: str):
+    role = role.lower()
+    if role not in ("primary", "secondary"):
+        raise HTTPException(status_code=400, detail="invalid role")
+    msgs = http_signal_queue[role][:]
+    http_signal_queue[role].clear()
+    return {"messages": msgs}
 
 # Global variables for prediction smoothing
 previous_predictions = []
