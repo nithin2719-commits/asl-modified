@@ -154,6 +154,15 @@ def _update_sentence(ch):
     prev_char = ch
 
 def predict(test_image, pts):
+    # Reject frames where the hand is too small (user is too far from camera)
+    xs = [p[0] for p in pts]
+    ys = [p[1] for p in pts]
+    span_w = max(xs) - min(xs)
+    span_h = max(ys) - min(ys)
+    diag = math.sqrt(span_w ** 2 + span_h ** 2)
+    if diag < 120:
+        return ""  # hand too far / not in frame enough for a reliable prediction
+
     # Ensure model input size
     white = cv2.resize(test_image, (400, 400))
     white = white.astype(np.float32)
@@ -164,9 +173,11 @@ def predict(test_image, pts):
     # Get confidence scores
     max_prob = np.max(prob)
     confidence_threshold = 0.3  # Minimum confidence for prediction
+    size_score = min(1.0, diag / 250.0)  # boost confidence if the hand is large/close
+    quality = max_prob * size_score
 
-    if max_prob < confidence_threshold:
-        return ""  # Low confidence, don't predict
+    if max_prob < confidence_threshold or quality < 0.25:
+        return ""  # Low confidence or low quality, don't predict
 
     ch1 = np.argmax(prob, axis=0)
     prob[ch1] = 0

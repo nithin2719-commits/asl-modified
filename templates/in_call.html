@@ -24,41 +24,44 @@
                     </div>
                 </div>
             </div>
-            <div class="call-controls">
-                <button class="control-btn" id="logout-btn" title="Logout">
-                    <i class="fas fa-right-from-bracket"></i>
-                    <span>Logout</span>
-                </button>
-                <button class="control-btn" id="mute-btn" title="Toggle Microphone">
-                    <i class="fas fa-microphone"></i>
-                </button>
-                <button class="control-btn" id="video-btn" title="Toggle Camera">
-                    <i class="fas fa-video"></i>
-                </button>
-                <button class="control-btn end-call" id="end-call-btn" title="End Call">
-                    <i class="fas fa-phone-slash"></i>
-                    <span>End Call</span>
-                </button>
-            </div>
         </div>
 
         <!-- Main Video Area -->
         <div class="video-area">
-            <!-- Remote Video (ASL Interpreter) -->
-            <div class="remote-video-container">
-                <video id="remote-video" autoplay muted></video>
-                <div class="participant-info">
-                    <div class="participant-name">ASL Interpreter</div>
-                    <div class="asl-output" id="asl-output">Ready for ASL detection...</div>
-                    <div class="asl-sentence" id="asl-sentence">Sentence: </div>
-                </div>
+            <div class="floating-controls">
+                <button class="control-pill" id="logout-btn" title="Logout">
+                    <i class="fas fa-right-from-bracket"></i>
+                    <span class="btn-label">Logout</span>
+                </button>
+                <button class="control-pill" id="mute-btn" title="Toggle Microphone">
+                    <i class="fas fa-microphone"></i>
+                    <span class="btn-label">Mute</span>
+                </button>
+                <button class="control-pill" id="video-btn" title="Toggle Camera">
+                    <i class="fas fa-video"></i>
+                    <span class="btn-label">Video</span>
+                </button>
+                <button class="control-pill end-pill" id="end-call-btn" title="End Call">
+                    <i class="fas fa-phone-slash"></i>
+                    <span class="btn-label">End</span>
+                </button>
             </div>
 
-            <!-- Local Video -->
-            <div class="local-video-container">
-                <video id="local-video" autoplay muted></video>
-                <div class="participant-info">
-                    <div class="participant-name">You</div>
+            <div class="call-stage">
+                <!-- Meet-like framed Video Canvas -->
+                <div class="remote-video-container">
+                    <div class="interpreter-badge"><i class="fas fa-brain"></i> ASL Interpreter</div>
+                    <video id="remote-video" autoplay muted></video>
+                    <!-- Local PIP -->
+                    <div class="local-video-bubble">
+                        <video id="local-video" autoplay muted></video>
+                        <div class="participant-name">You</div>
+                    </div>
+                    <div class="participant-info">
+                        <div class="participant-name">ASL Interpreter</div>
+                        <div class="asl-output" id="asl-output">Ready for ASL detection...</div>
+                        <div class="asl-sentence" id="asl-sentence">Sentence: </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -95,17 +98,31 @@
         const callTimer = document.getElementById('call-timer');
         const muteBtn = document.getElementById('mute-btn');
         const videoBtn = document.getElementById('video-btn');
+        const muteLabel = muteBtn.querySelector('.btn-label');
+        const videoLabel = videoBtn.querySelector('.btn-label');
+        const muteIcon = muteBtn.querySelector('i');
+        const videoIcon = videoBtn.querySelector('i');
         const endCallBtn = document.getElementById('end-call-btn');
         const logoutBtn = document.getElementById('logout-btn');
         const cameraPrompt = document.getElementById('camera-prompt');
         const startCameraBtn = document.getElementById('start-camera-btn');
         const mirrorCanvas = true;
+        const controlPills = document.querySelectorAll('.control-pill');
 
         let callStartTime = Date.now();
         let timerInterval;
         let isMuted = false;
         let isVideoOff = false;
         localVideo.classList.toggle('mirrored', mirrorCanvas);
+
+        // Button hover glow position
+        controlPills.forEach(btn => {
+            btn.addEventListener('mousemove', (e) => {
+                const rect = btn.getBoundingClientRect();
+                btn.style.setProperty('--x', `${e.clientX - rect.left}px`);
+                btn.style.setProperty('--y', `${e.clientY - rect.top}px`);
+            });
+        });
 
         // Start call timer
         function startTimer() {
@@ -131,6 +148,7 @@
                 });
 
                 localVideo.srcObject = stream;
+                remoteVideo.srcObject = stream;
                 cameraPrompt.style.display = 'none';
                 startTimer();
                 startASLDetection();
@@ -218,6 +236,9 @@
                 audioTrack.enabled = !audioTrack.enabled;
                 isMuted = !isMuted;
                 muteBtn.classList.toggle('active', isMuted);
+                muteBtn.classList.toggle('pill-off', isMuted);
+                muteLabel.textContent = isMuted ? 'Unmute' : 'Mute';
+                muteIcon.className = isMuted ? 'fas fa-microphone-slash' : 'fas fa-microphone';
             }
         });
 
@@ -228,6 +249,9 @@
                 videoTrack.enabled = !videoTrack.enabled;
                 isVideoOff = !isVideoOff;
                 videoBtn.classList.toggle('active', isVideoOff);
+                videoBtn.classList.toggle('pill-off', isVideoOff);
+                videoLabel.textContent = isVideoOff ? 'Turn Video On' : 'Video';
+                videoIcon.className = isVideoOff ? 'fas fa-video-slash' : 'fas fa-video';
             }
         });
 
