@@ -20,6 +20,7 @@ import hashlib
 import hmac
 import time
 from typing import Dict, Optional
+from string import ascii_uppercase
 
 app = FastAPI()
 
@@ -42,9 +43,11 @@ app.add_middleware(
 
 # Load model and initialize detectors
 model = load_model('cnn8grps_rad1_model.h5')
-hd = HandDetector(maxHands=1, detectionCon=0.7, minTrackCon=0.6)
-hd2 = HandDetector(maxHands=1, detectionCon=0.7, minTrackCon=0.6)
-offset = 29
+# Lower thresholds slightly more to keep tracking stable at distance and close-up
+hd = HandDetector(maxHands=1, detectionCon=0.48, minTrackCon=0.4)
+hd2 = HandDetector(maxHands=1, detectionCon=0.48, minTrackCon=0.4)
+# Slightly larger crop margin to retain context when near frame edges/close to camera
+offset = 40
 mirror_input = False
 
 # Auth / DB
@@ -237,8 +240,13 @@ async def signal_recv(role: str):
 
 # Global variables for prediction smoothing
 previous_predictions = []
-smoothing_window = 3
-min_confidence = 0.3
+smoothing_window = 2  # lighter smoothing for faster response
+min_confidence = 0.32
+# Debounce counter for "next" gesture to avoid accidental triggers
+next_streak = 0
+# Letter stability to avoid single-frame flips
+stable_letter = ""
+stable_count = 0
 
 # Global text state
 sentence = ""
@@ -251,6 +259,60 @@ last_result = {"letter": "", "sentence": "", "ts": 0}
 
 def distance(x, y):
     return math.sqrt(((x[0] - y[0]) ** 2) + ((x[1] - y[1]) ** 2))
+
+def _adjust_gamma(image, gamma: float):
+    inv_gamma = 1.0 / gamma
+    table = (np.arange(256) / 255.0) ** inv_gamma * 255
+    return cv2.LUT(image, table.astype("uint8"))
+
+def _normalize_frame(frame: np.ndarray) -> np.ndarray:
+    """Lighting normalization for dark/bright backgrounds to stabilize detection."""
+    try:
+        lab = cv2.cvtColor(frame, cv2.COLOR_BGR2LAB)
+        l, a, b = cv2.split(lab)
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        l = clahe.apply(l)
+        lab = cv2.merge((l, a, b))
+        norm = cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
+    except Exception:
+        norm = frame
+
+    mean = cv2.cvtColor(norm, cv2.COLOR_BGR2GRAY).mean()
+    if mean < 90:
+        norm = _adjust_gamma(norm, 0.85)  # brighten dark scenes
+    elif mean > 170:
+        norm = _adjust_gamma(norm, 1.15)  # tame bright scenes
+    return norm
+
+def _is_next_gesture(pts):
+    """
+    Detect a deliberate closed-fist "next" gesture.
+    Tightens conditions so the ASL letter 'A' (thumb outside) doesn't trigger it.
+    """
+    xs = [p[0] for p in pts]
+    ys = [p[1] for p in pts]
+    diag = math.sqrt((max(xs) - min(xs)) ** 2 + (max(ys) - min(ys)) ** 2)
+    # Require a reasonably large hand in frame to reduce far-distance misfires
+    if diag < 90:
+        return False
+
+    fold_margin = max(12, diag * 0.10)
+
+    # All fingertips must be clearly below their MCP joints (folded fingers)
+    folded = (
+        pts[8][1] > pts[5][1] + fold_margin and
+        pts[12][1] > pts[9][1] + fold_margin and
+        pts[16][1] > pts[13][1] + fold_margin and
+        pts[20][1] > pts[17][1] + fold_margin
+    )
+
+    # Thumb tip should sit inside the palm box (between index and ring MCP x-range) and below its MCP
+    palm_x_min = min(pts[5][0], pts[9][0], pts[13][0])
+    palm_x_max = max(pts[5][0], pts[9][0], pts[13][0])
+    thumb_inside = (palm_x_min + 6) <= pts[4][0] <= (palm_x_max - 6)
+    thumb_below_mcp = pts[4][1] > pts[2][1] + 4
+
+    return folded and thumb_inside and thumb_below_mcp
 
 def _update_sentence(ch):
     global sentence, prev_char, count, ten_prev_char
@@ -272,14 +334,27 @@ def _update_sentence(ch):
     prev_char = ch
 
 def predict(test_image, pts):
+    global previous_predictions, last_result, next_streak, stable_letter, stable_count
     # Reject frames where the hand is too small (user is too far from camera)
     xs = [p[0] for p in pts]
     ys = [p[1] for p in pts]
     span_w = max(xs) - min(xs)
     span_h = max(ys) - min(ys)
     diag = math.sqrt(span_w ** 2 + span_h ** 2)
-    if diag < 120:
+    if diag < 70:
         return ""  # hand too far / not in frame enough for a reliable prediction
+
+    # Fast path with debounce: detect "next" gesture directly from landmarks
+    if _is_next_gesture(pts):
+        next_streak += 1
+        if next_streak >= 2:  # require two consecutive frames
+            ch1 = "next"
+            previous_predictions.clear()
+            _update_sentence(ch1)
+            last_result = {"letter": ch1, "sentence": sentence, "ts": int(time.time() * 1000)}
+            return ch1
+    else:
+        next_streak = 0
 
     # Ensure model input size
     white = cv2.resize(test_image, (400, 400))
@@ -288,21 +363,24 @@ def predict(test_image, pts):
 
     prob = np.array(model.predict(white, verbose=0)[0], dtype='float32')
 
-    # Get confidence scores
-    max_prob = np.max(prob)
-    confidence_threshold = 0.3  # Minimum confidence for prediction
-    size_score = min(1.0, diag / 250.0)  # boost confidence if the hand is large/close
+    # Get confidence scores with top-2 margin filtering
+    max_prob = float(np.max(prob))
+    confidence_threshold = 0.32  # Minimum confidence for prediction
+    size_score = min(1.0, diag / 170.0)  # boost confidence if the hand is large/close
     quality = max_prob * size_score
 
-    if max_prob < confidence_threshold or quality < 0.25:
+    top1 = int(np.argmax(prob))
+    prob[top1] = 0.0
+    top2 = float(np.max(prob))
+    margin = max_prob - top2
+
+    if max_prob < confidence_threshold or quality < 0.18 or margin < 0.10:
         return ""  # Low confidence or low quality, don't predict
 
-    ch1 = np.argmax(prob, axis=0)
-    prob[ch1] = 0
-    ch2 = np.argmax(prob, axis=0)
+    ch1 = top1
+    ch2 = int(np.argmax(prob))
     prob[ch2] = 0
-    ch3 = np.argmax(prob, axis=0)
-    prob[ch3] = 0
+    ch3 = int(np.argmax(prob))
 
     pl = [ch1, ch2]
 
@@ -627,7 +705,6 @@ def predict(test_image, pts):
             ch1 = 'R'
 
     # Apply prediction smoothing
-    global previous_predictions
     previous_predictions.append(ch1)
     if len(previous_predictions) > smoothing_window:
         previous_predictions.pop(0)
@@ -641,6 +718,24 @@ def predict(test_image, pts):
         ch1 = ch1
     else:
         ch1 = ""  # Low confidence, no prediction
+
+    # Suppress spurious 'J' unless confidence and hand size are sufficient
+    if ch1 == 'J':
+        if quality < 0.33 or diag < 110:
+            ch1 = ""
+
+    # Require short stability for letter outputs (not for controls)
+    if ch1 in ascii_uppercase:
+        if ch1 == stable_letter:
+            stable_count += 1
+        else:
+            stable_letter = ch1
+            stable_count = 1
+        if stable_count < 2:
+            return ""
+    else:
+        stable_letter = ""
+        stable_count = 0
 
     # Special gesture controls
     # Space: mostly closed hand with pinky up
@@ -664,7 +759,6 @@ def predict(test_image, pts):
 
     _update_sentence(ch1)
     # update shared result
-    global last_result
     last_result = {"letter": ch1, "sentence": sentence, "ts": int(time.time() * 1000)}
     return ch1
 
@@ -683,6 +777,8 @@ async def predict_endpoint(data: dict, request: Request):
     frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
     if frame is None:
         return {"letter": ""}
+    # Normalize lighting to handle dark/bright backgrounds
+    frame = _normalize_frame(frame)
     # Flip to correct inverted camera if needed
     cv2image = cv2.flip(frame, 1) if mirror_input else frame
     hands, _ = hd.findHands(cv2image, draw=False, flipType=False)
@@ -698,6 +794,13 @@ async def predict_endpoint(data: dict, request: Request):
             y2 = min(y + h + offset, h_img)
             if x2 > x1 and y2 > y1:
                 image = cv2image[y1:y2, x1:x2]
+                # Upscale small crops to help detection when the signer is farther away
+                h_crop, w_crop = image.shape[:2]
+                if min(h_crop, w_crop) < 160:
+                    scale = 180 / max(1, min(h_crop, w_crop))
+                    new_w = max(200, int(w_crop * scale))
+                    new_h = max(200, int(h_crop * scale))
+                    image = cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_CUBIC)
                 white = np.ones((400, 400, 3), dtype=np.uint8) * 255
                 hands2, _ = hd2.findHands(image, draw=False, flipType=False)
                 if hands2:

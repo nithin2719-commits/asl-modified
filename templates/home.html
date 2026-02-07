@@ -114,7 +114,7 @@
                         </div>
                     </div>
                     <div class="feature-card">
-                        <div class="feature-icon">🖐️</div>
+                        <div class="feature-icon">✋</div>
                         <div>
                             <h4>B</h4>
                             <p>Flat palm facing camera; thumb tucked across the palm.</p>
@@ -313,7 +313,7 @@
             const latency = 40 + Math.random() * 80;
             latencyData.push(latency);
             if (latencyData.length > maxLatencyPoints) latencyData.shift();
-            latencyCurrent.textContent = `${Math.round(latency)} ms`;
+            if (latencyCurrent) latencyCurrent.textContent = `${Math.round(latency)} ms`;
 
             const item = document.createElement('div');
             item.className = 'detection-item';

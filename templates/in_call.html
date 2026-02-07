@@ -181,7 +181,12 @@
                 console.log('Camera permission status:', permissionStatus.state);
 
                 const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { width: 640, height: 480, facingMode: 'user' },
+                    video: {
+                        width: { ideal: 640 },
+                        height: { ideal: 360 },
+                        frameRate: { ideal: 30, max: 30 },
+                        facingMode: 'user'
+                    },
                     audio: true
                 });
 
@@ -270,7 +275,7 @@
                 } finally {
                     inFlight = false;
                 }
-            }, 200); // Faster detection
+            }, 80); // Faster detection
         }
 
         // Control buttons

@@ -17,7 +17,7 @@ body {
 }
 
 .container {
-    max-width: 1200px;
+    max-width: 1400px;
     margin: 0 auto;
     padding: 20px;
     flex: 1;
@@ -1529,7 +1529,7 @@ body.home-page {
 
 .home-page .container {
     flex: initial;
-    width: min(1220px, 100%);
+    width: min(1600px, 100%);
 }
 
 .home-visuals {
@@ -1684,22 +1684,32 @@ body.home-page {
 
 .home-main {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 22px;
+    grid-template-columns: 1.05fr 0.95fr;
+    gap: 20px;
     align-items: start;
-    padding: 30px 22px 40px;
+    padding: 24px 10px 40px;
     min-height: calc(100vh - 140px);
     position: relative;
     z-index: 1;
+}
+
+.home-layout {
+    display: contents;
 }
 
 .hero-copy {
     grid-column: 1 / 2;
 }
 
+.center-stack {
+    grid-column: 1 / 2;
+}
+
 .role-cards {
     grid-column: 2 / 3;
     align-self: start;
+    display: grid;
+    gap: 18px;
 }
 
 .about-card {
@@ -1849,8 +1859,8 @@ body.home-page {
 
 .feature-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 8px;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 14px;
     margin-top: 10px;
 }
 
