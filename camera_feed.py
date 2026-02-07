@@ -44,11 +44,11 @@ app.add_middleware(
 # Load model and initialize detectors
 model = load_model('cnn8grps_rad1_model.h5')
 # Lower thresholds slightly more to keep tracking stable at distance and close-up
-hd = HandDetector(maxHands=1, detectionCon=0.48, minTrackCon=0.4)
-hd2 = HandDetector(maxHands=1, detectionCon=0.48, minTrackCon=0.4)
-# Slightly larger crop margin to retain context when near frame edges/close to camera
-offset = 40
-mirror_input = False
+hd = HandDetector(maxHands=1, detectionCon=0.50, minTrackCon=0.35)
+hd2 = HandDetector(maxHands=1, detectionCon=0.50, minTrackCon=0.35)
+# Slightly adjust crop margin to keep more of the hand visible
+offset = 45
+mirror_input = False  # keep original orientation for model consistency
 
 # Auth / DB
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "signflow.db")
@@ -239,9 +239,11 @@ async def signal_recv(role: str):
     return {"messages": msgs}
 
 # Global variables for prediction smoothing
-previous_predictions = []
-smoothing_window = 2  # lighter smoothing for faster response
-min_confidence = 0.32
+from collections import deque
+
+previous_predictions = deque(maxlen=5)
+smoothing_window = 3  # balanced stability
+min_confidence = 0.35
 # Debounce counter for "next" gesture to avoid accidental triggers
 next_streak = 0
 # Letter stability to avoid single-frame flips
@@ -256,6 +258,21 @@ ten_prev_char = [" "] * 10
 
 # Shared last detection result for secondary display
 last_result = {"letter": "", "sentence": "", "ts": 0}
+
+def _reset_state():
+    """Clear prediction buffers so stale letters don't persist across restarts/logouts."""
+    global sentence, prev_char, count, ten_prev_char, previous_predictions, next_streak, stable_letter, stable_count, last_result
+    sentence = ""
+    prev_char = ""
+    count = -1
+    ten_prev_char = [" "] * 10
+    previous_predictions.clear()
+    next_streak = 0
+    stable_letter = ""
+    stable_count = 0
+    last_result = {"letter": "", "sentence": "", "ts": int(time.time() * 1000)}
+
+_reset_state()
 
 def distance(x, y):
     return math.sqrt(((x[0] - y[0]) ** 2) + ((x[1] - y[1]) ** 2))
@@ -293,7 +310,7 @@ def _is_next_gesture(pts):
     ys = [p[1] for p in pts]
     diag = math.sqrt((max(xs) - min(xs)) ** 2 + (max(ys) - min(ys)) ** 2)
     # Require a reasonably large hand in frame to reduce far-distance misfires
-    if diag < 90:
+    if diag < 70:
         return False
 
     fold_margin = max(12, diag * 0.10)
@@ -341,7 +358,7 @@ def predict(test_image, pts):
     span_w = max(xs) - min(xs)
     span_h = max(ys) - min(ys)
     diag = math.sqrt(span_w ** 2 + span_h ** 2)
-    if diag < 70:
+    if diag < 55:
         return ""  # hand too far / not in frame enough for a reliable prediction
 
     # Fast path with debounce: detect "next" gesture directly from landmarks
@@ -374,7 +391,7 @@ def predict(test_image, pts):
     top2 = float(np.max(prob))
     margin = max_prob - top2
 
-    if max_prob < confidence_threshold or quality < 0.18 or margin < 0.10:
+    if max_prob < confidence_threshold or quality < 0.22 or margin < 0.12:
         return ""  # Low confidence or low quality, don't predict
 
     ch1 = top1
@@ -706,8 +723,6 @@ def predict(test_image, pts):
 
     # Apply prediction smoothing
     previous_predictions.append(ch1)
-    if len(previous_predictions) > smoothing_window:
-        previous_predictions.pop(0)
 
     # Return most common prediction in the window, but only if confidence is high
     if max_prob >= min_confidence and previous_predictions:
@@ -829,9 +844,11 @@ async def predict_endpoint(data: dict, request: Request):
                         for i in range(21):
                             cv2.circle(white, (pts[i][0] + os, pts[i][1] + os1), 2, (0, 0, 255), 1)
                         res = white
+                        # Prepare model input from the original cropped hand (better accuracy than skeleton only)
+                        image_for_model = cv2.resize(image, (400, 400), interpolation=cv2.INTER_CUBIC)
                         # Only run prediction/update if this is the primary user
                         if username.lower() == "primary":
-                            letter = predict(res, pts)
+                            letter = predict(image_for_model, pts)
                         else:
                             letter = ""
                         print("Recognized letter:", letter)
@@ -844,6 +861,7 @@ async def home(request: Request):
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
     # Clear any existing session cookie on the login screen to avoid stale logins
+    _reset_state()
     resp = templates.TemplateResponse("login.html", {"request": request})
     resp.delete_cookie("session")
     return resp
@@ -862,6 +880,7 @@ async def call(request: Request):
     user = _get_user_from_session(token)
     if not user:
         return RedirectResponse(url="/", status_code=302)
+    _reset_state()
     return templates.TemplateResponse("in_call.html", {"request": request, "username": user[1]})
 
 @app.post("/signup")
@@ -947,6 +966,7 @@ async def login(data: dict, request: Request, response: Response):
     conn.close()
 
     response.set_cookie("session", token, httponly=True, samesite="lax")
+    _reset_state()
     return {"ok": True, "created": False}
 
 @app.post("/logout")
@@ -959,6 +979,12 @@ async def logout(request: Request, response: Response):
         conn.commit()
         conn.close()
     response.delete_cookie("session")
+    _reset_state()
+    return {"ok": True}
+
+@app.post("/reset_state")
+async def reset_state():
+    _reset_state()
     return {"ok": True}
 
 

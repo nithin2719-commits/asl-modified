@@ -7,27 +7,38 @@ import cv2
 import numpy as np
 import pyttsx3
 import enchant
-from collections import deque
+from collections import deque, Counter
 from keras.models import load_model
 from cvzone.HandTrackingModule import HandDetector
 import tkinter as tk
 from PIL import Image, ImageTk
 
+def preprocess_crop(img):
+    """Stabilize lighting for clearer predictions."""
+    if img is None or img.size == 0:
+        return img
+    ycrcb = cv2.cvtColor(img, cv2.COLOR_BGR2YCrCb)
+    y, cr, cb = cv2.split(ycrcb)
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    y = clahe.apply(y)
+    ycrcb = cv2.merge((y, cr, cb))
+    balanced = cv2.cvtColor(ycrcb, cv2.COLOR_YCrCb2BGR)
+    return cv2.bilateralFilter(balanced, 5, 35, 35)
+
 # --------------- Config ----------------
 MODEL_PATH = "cnn8grps_rad1_model.h5"
 OFFSET = 30
-MIN_HAND_DIAG = 70          # accept smaller/farther hands
-CONF_THRESH = 0.32
-MARGIN_THRESH = 0.10        # top1-top2 gap
-QUALITY_MIN = 0.18          # max_prob * size_score
-SMOOTH_WINDOW = 2           # lighter smoothing for speed
-LOOP_DELAY_MS = 25          # balanced speed/precision
+MIN_HAND_DIAG = 80          # clearer shapes; still works at moderate distance
+CONF_THRESH = 0.40
+MARGIN_THRESH = 0.12        # top1-top2 gap
+QUALITY_MIN = 0.22          # max_prob * size_score
+SMOOTH_WINDOW = 3           # a bit more smoothing for accuracy
+LOOP_DELAY_MS = 18          # balanced speed/precision
 # ---------------------------------------
 
 dct = enchant.Dict("en-US")
 hd = HandDetector(maxHands=1, detectionCon=0.65, minTrackCon=0.55)
-hd2 = HandDetector(maxHands=1, detectionCon=0.65, minTrackCon=0.55)
-
+hd2 = HandDetector(maxHands=1, detectionCon=0.70, minTrackCon=0.55)
 
 class Application:
     def __init__(self):
@@ -123,7 +134,8 @@ class Application:
 
     # ---------- Classification ----------
     def classify(self, img, diag):
-        white = cv2.resize(img, (400, 400), interpolation=cv2.INTER_CUBIC).astype(np.float32)
+        clean = preprocess_crop(img)
+        white = cv2.resize(clean, (400, 400), interpolation=cv2.INTER_CUBIC).astype(np.float32)
         prob = np.array(self.model.predict(white.reshape(1, 400, 400, 3), verbose=0)[0], dtype="float32")
         top1 = int(np.argmax(prob))
         top1p = float(prob[top1])
@@ -195,10 +207,9 @@ class Application:
             return ""
         ch = self.group_to_letter(ch_raw)
         # Debounce J
-        if ch == 'J' and (quality < 0.40 or diag < 120):
+        if ch == 'J' and (quality < 0.45 or diag < 120):
             return ""
         self.smoothing.append(ch)
-        from collections import Counter
         if len(self.smoothing) < 2:
             return ""
         return Counter(self.smoothing).most_common(1)[0][0]
@@ -258,10 +269,10 @@ class Application:
                             else:
                                 # Upscale small crops for clearer prediction at distance
                                 h_c, w_c = crop.shape[:2]
-                                if min(h_c, w_c) < 180:
-                                    scale = 200 / max(1, min(h_c, w_c))
-                                    new_w = max(200, int(w_c * scale))
-                                    new_h = max(200, int(h_c * scale))
+                                if min(h_c, w_c) < 190:
+                                    scale = 220 / max(1, min(h_c, w_c))
+                                    new_w = max(220, int(w_c * scale))
+                                    new_h = max(220, int(h_c * scale))
                                     crop_up = cv2.resize(crop, (new_w, new_h), interpolation=cv2.INTER_CUBIC)
                                 else:
                                     crop_up = crop

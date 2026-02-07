@@ -1520,9 +1520,12 @@ body.home-page {
     --home-cyan: #00d4ff;
     --home-purple: #6a5cff;
     --home-surface: rgba(13, 17, 31, 0.75);
-    background: radial-gradient(circle at 20% 20%, rgba(0, 212, 255, 0.12), transparent 28%),
-                radial-gradient(circle at 80% 0%, rgba(106, 92, 255, 0.18), transparent 30%),
-                #050712;
+    background:
+        radial-gradient(circle at 20% 20%, rgba(0, 212, 255, 0.14), transparent 28%),
+        radial-gradient(circle at 78% 12%, rgba(106, 92, 255, 0.18), transparent 32%),
+        radial-gradient(circle at 12% 78%, rgba(0, 255, 209, 0.12), transparent 30%),
+        linear-gradient(135deg, #050712 0%, #070a16 45%, #050712 100%);
+    background-attachment: fixed;
     color: #e9f3ff;
     overflow-x: hidden;
 }
@@ -1537,6 +1540,44 @@ body.home-page {
     inset: 0;
     z-index: -2;
     overflow: hidden;
+    background: linear-gradient(120deg,
+                rgba(0, 212, 255, 0.12) 0%,
+                rgba(0, 212, 255, 0.06) 18%,
+                transparent 32%,
+                transparent 68%,
+                rgba(106, 92, 255, 0.08) 82%,
+                rgba(0, 212, 255, 0.12) 100%);
+    background-size: 220% 220%;
+    animation: sweep-light 32s ease-in-out infinite;
+    mix-blend-mode: screen;
+}
+
+.home-visuals::before {
+    content: "";
+    position: absolute;
+    inset: -20%;
+    background:
+        conic-gradient(from 120deg, rgba(0, 212, 255, 0.24), rgba(106, 92, 255, 0.2), rgba(0, 212, 255, 0.24));
+    filter: blur(120px);
+    opacity: 0.35;
+    animation: rotate-halo 32s linear infinite;
+}
+
+.home-visuals::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image:
+        radial-gradient(1px 1px at 12% 18%, rgba(255,255,255,0.42) 0, transparent 45%),
+        radial-gradient(1px 1px at 42% 62%, rgba(255,255,255,0.32) 0, transparent 48%),
+        radial-gradient(1px 1px at 78% 34%, rgba(255,255,255,0.36) 0, transparent 46%),
+        radial-gradient(1px 1px at 22% 84%, rgba(0,212,255,0.35) 0, transparent 52%),
+        radial-gradient(1px 1px at 68% 78%, rgba(106,92,255,0.35) 0, transparent 52%);
+    background-size: 220px 220px;
+    opacity: 0.25;
+    mix-blend-mode: screen;
+    animation: star-drift 38s linear infinite;
+    pointer-events: none;
 }
 
 .home-aurora {
@@ -1926,6 +1967,7 @@ body.home-page {
     color: #c2d5ef;
     line-height: 1.4;
 }
+
 
 .role-cards {
     display: grid;
@@ -2520,6 +2562,23 @@ body.home-page {
 @keyframes grid-move {
     0% { transform: translateY(0); }
     100% { transform: translateY(120px); }
+}
+
+@keyframes rotate-halo {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+@keyframes star-drift {
+    0% { transform: translate3d(0, 0, 0); }
+    50% { transform: translate3d(-12px, -8px, 0); }
+    100% { transform: translate3d(0, 0, 0); }
+}
+
+@keyframes sweep-light {
+    0% { background-position: 0% 20%; }
+    50% { background-position: 80% 80%; }
+    100% { background-position: 0% 20%; }
 }
 
 @keyframes pulse {
