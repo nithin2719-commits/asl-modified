@@ -17,6 +17,18 @@
             <span class="orb orb-2"></span>
             <span class="orb orb-3"></span>
         </div>
+        <div class="beams">
+            <span class="beam beam-1"></span>
+            <span class="beam beam-2"></span>
+            <span class="beam beam-3"></span>
+        </div>
+        <div class="rings"></div>
+        <div class="scanlines"></div>
+        <div class="dust">
+            <span></span><span></span><span></span><span></span><span></span><span></span>
+            <span></span><span></span><span></span><span></span><span></span><span></span>
+        </div>
+        <div class="vignette"></div>
     </div>
 
     <header class="home-nav container">
@@ -264,6 +276,12 @@
             const root = document.documentElement;
             root.style.setProperty('--mouse-x', `${event.clientX}px`);
             root.style.setProperty('--mouse-y', `${event.clientY}px`);
+        });
+
+        // Cursor glow
+        document.addEventListener('pointermove', (e) => {
+            document.documentElement.style.setProperty('--mx', `${(e.clientX / window.innerWidth) * 100}%`);
+            document.documentElement.style.setProperty('--my', `${(e.clientY / window.innerHeight) * 100}%`);
         });
 
         // Session uptime + health sparkles
