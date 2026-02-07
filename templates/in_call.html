@@ -14,9 +14,9 @@
             <div class="brand-info">
                 <div class="brand-logo">
                     <i class="fas fa-sign-language"></i>
-                    <span class="brand-name">SignFlow</span>
                 </div>
                 <div class="call-info">
+                    <div class="brand-name-text">SignFlow</div>
                     <h2>ASL Video Call</h2>
                     <div class="call-status">
                         <span class="status-dot connected"></span>
@@ -24,43 +24,73 @@
                     </div>
                 </div>
             </div>
+            <div class="call-meta">
+                <div class="mini-pill live">
+                    <span class="pulse-dot"></span>
+                    <i class="fas fa-hand-sparkles"></i>
+                    <span>ASL engine</span>
+                </div>
+                <div class="mini-bars" aria-label="Signal quality">
+                    <span></span><span></span><span></span><span></span><span></span>
+                </div>
+                <div class="call-timer-pill">
+                    <i class="fas fa-clock"></i>
+                    <span id="call-timer">00:00:00</span>
+                </div>
+            </div>
         </div>
 
         <!-- Main Video Area -->
         <div class="video-area">
-            <div class="floating-controls">
-                <button class="control-pill" id="logout-btn" title="Logout">
-                    <i class="fas fa-right-from-bracket"></i>
-                    <span class="btn-label">Logout</span>
-                </button>
-                <button class="control-pill" id="mute-btn" title="Toggle Microphone">
-                    <i class="fas fa-microphone"></i>
-                    <span class="btn-label">Mute</span>
-                </button>
-                <button class="control-pill" id="video-btn" title="Toggle Camera">
-                    <i class="fas fa-video"></i>
-                    <span class="btn-label">Video</span>
-                </button>
-                <button class="control-pill end-pill" id="end-call-btn" title="End Call">
-                    <i class="fas fa-phone-slash"></i>
-                    <span class="btn-label">End</span>
-                </button>
-            </div>
-
-            <div class="call-stage">
-                <!-- Meet-like framed Video Canvas -->
-                <div class="remote-video-container">
-                    <div class="interpreter-badge"><i class="fas fa-brain"></i> ASL Interpreter</div>
-                    <video id="remote-peer" autoplay playsinline></video>
-                    <!-- Local PIP -->
-                    <div class="local-video-bubble">
-                        <video id="local-video" autoplay muted playsinline></video>
-                        <div class="participant-name">You</div>
+            <div class="video-main">
+                <div class="left-control-dock">
+                    <div class="floating-controls">
+                        <button class="control-pill" id="logout-btn" title="Logout">
+                            <i class="fas fa-right-from-bracket"></i>
+                            <span class="btn-label">Logout</span>
+                        </button>
+                        <button class="control-pill" id="mute-btn" title="Toggle Microphone">
+                            <i class="fas fa-microphone"></i>
+                            <span class="btn-label">Mute</span>
+                        </button>
+                        <button class="control-pill" id="video-btn" title="Toggle Camera">
+                            <i class="fas fa-video"></i>
+                            <span class="btn-label">Video</span>
+                        </button>
+                        <button class="control-pill end-pill" id="end-call-btn" title="End Call">
+                            <i class="fas fa-phone-slash"></i>
+                            <span class="btn-label">End</span>
+                        </button>
                     </div>
-                    <div class="participant-info">
-                        <div class="participant-name">ASL Interpreter</div>
-                        <div class="asl-output" id="asl-output">Ready for ASL detection...</div>
-                        <div class="asl-sentence" id="asl-sentence">Sentence: </div>
+                </div>
+
+                <div class="call-stage">
+                    <!-- Meet-like framed Video Canvas -->
+                    <div class="remote-video-container">
+                        <div class="interpreter-badge"><i class="fas fa-brain"></i> ASL Interpreter</div>
+                        <video id="remote-peer" autoplay playsinline></video>
+                        <!-- Local PIP -->
+                        <div class="local-video-bubble">
+                            <video id="local-video" autoplay muted playsinline></video>
+                            <div class="participant-name">You</div>
+                        </div>
+                        <div class="gesture-telemetry">
+                            <div class="telemetry-title">
+                                <span class="dot"></span> ASL stream
+                            </div>
+                            <div class="telemetry-bars">
+                                <span></span><span></span><span></span><span></span><span></span>
+                            </div>
+                            <div class="telemetry-meta">
+                                <i class="fas fa-brain"></i>
+                                <span id="live-letter">Listening...</span>
+                            </div>
+                        </div>
+                        <div class="participant-info">
+                            <div class="participant-name">ASL Interpreter</div>
+                            <div class="asl-output" id="asl-output">Ready for ASL detection...</div>
+                            <div class="asl-sentence" id="asl-sentence">Sentence: </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -68,11 +98,6 @@
 
         <!-- ASL Detection Canvas (Hidden) -->
         <canvas id="canvas" width="320" height="240" style="display:none;"></canvas>
-
-        <!-- Call Duration -->
-        <div class="call-duration">
-            <span id="call-timer">00:00:00</span>
-        </div>
 
         <!-- Camera Permission Prompt -->
         <div id="camera-prompt" class="camera-prompt">
@@ -108,6 +133,9 @@
         const logoutBtn = document.getElementById('logout-btn');
         const cameraPrompt = document.getElementById('camera-prompt');
         const startCameraBtn = document.getElementById('start-camera-btn');
+        const miniBars = document.querySelectorAll('.mini-bars span');
+        const telemetryBars = document.querySelectorAll('.telemetry-bars span');
+        const liveLetter = document.getElementById('live-letter');
         const mirrorCanvas = true;
         const ROLE = "{{ username|default('')|lower }}";
         const controlPills = document.querySelectorAll('.control-pill');
@@ -126,6 +154,13 @@
                 btn.style.setProperty('--y', `${e.clientY - rect.top}px`);
             });
         });
+
+        function flash(el) {
+            if (!el) return;
+            el.classList.remove('flash');
+            void el.offsetWidth;
+            el.classList.add('flash');
+        }
 
         // Start call timer
         function startTimer() {
@@ -221,17 +256,20 @@
                     });
 
                     const result = await response.json();
-                if (result.letter) {
-                    aslOutput.textContent = `Detected: ${result.letter}`;
+                    if (result.letter) {
+                        aslOutput.textContent = `Detected: ${result.letter}`;
+                        liveLetter.textContent = result.letter;
+                        flash(aslOutput);
+                        flash(liveLetter);
+                    }
+                    if (typeof result.sentence === 'string') {
+                        aslSentence.textContent = `Sentence: ${result.sentence}`;
+                    }
+                } catch (error) {
+                    console.error('Error detecting ASL:', error);
+                } finally {
+                    inFlight = false;
                 }
-                if (typeof result.sentence === 'string') {
-                    aslSentence.textContent = `Sentence: ${result.sentence}`;
-                }
-            } catch (error) {
-                console.error('Error detecting ASL:', error);
-            } finally {
-                inFlight = false;
-            }
             }, 200); // Faster detection
         }
 
@@ -284,6 +322,18 @@
             cameraPrompt.style.display = 'flex';
             aslOutput.textContent = 'Click "Allow Camera Access" to start ASL recognition.';
         });
+
+        // Animate tiny signal bars
+        function animateBars(nodes) {
+            nodes.forEach((bar, idx) => {
+                const h = 20 + Math.random() * 60;
+                bar.style.height = `${h}%`;
+                bar.style.transition = 'height 0.28s ease';
+                bar.style.transitionDelay = `${idx * 40}ms`;
+            });
+        }
+        setInterval(() => animateBars(miniBars), 900);
+        setInterval(() => animateBars(telemetryBars), 1100);
 
         // ------------------ WebRTC Signaling ------------------
         let pc = null;

@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SignFlow | Choose Your Role</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="home-page">
+    <div class="home-visuals" aria-hidden="true">
+        <div class="home-aurora"></div>
+        <div class="home-aurora aurora-secondary"></div>
+        <div class="home-grid"></div>
+        <div class="floating-orbs">
+            <span class="orb orb-1"></span>
+            <span class="orb orb-2"></span>
+            <span class="orb orb-3"></span>
+        </div>
+    </div>
+
+    <header class="home-nav container">
+        <div class="brand-mark">
+            <div class="brand-logo">
+                <i class="fas fa-sign-language"></i>
+            </div>
+            <div class="brand-text">
+                <span class="brand-title">SignFlow</span>
+                <span class="brand-tag">ASL Live Interpreter</span>
+            </div>
+            <span class="live-chip"><span class="dot"></span>Live</span>
+        </div>
+        <nav class="nav-actions">
+            <a class="ghost-link" href="/login">Log in</a>
+            <a class="primary-link" href="/signup">Sign up</a>
+        </nav>
+    </header>
+
+    <main class="home-main container">
+        <section class="hero-copy">
+            <p class="eyebrow">ASL-first video calling</p>
+            <h1>Are you signing or reading today?</h1>
+            <p class="lede">
+                Pick your lane and we’ll tune the experience to you. Signers stream gestures with the model running locally;
+                readers get the live transcript with buttery WebRTC video.
+            </p>
+
+            <div class="hero-live">
+                <div class="live-pill">
+                    <span class="dot"></span>
+                    <span>Live status</span>
+                </div>
+            </div>
+
+            <div class="hero-ctas">
+                <a class="cta primary" href="/login?role=primary" data-role-select="signer">
+                    <span>I'm a signer</span>
+                    <i class="fas fa-arrow-right"></i>
+                </a>
+                <a class="cta ghost" href="/login?role=secondary" data-role-select="reader">
+                    <span>I'm a reader</span>
+                    <i class="fas fa-arrow-right"></i>
+                </a>
+            </div>
+            <p class="cta-note">No account? <a href="/signup">Create one</a> or hop in with the demo credentials below.</p>
+
+            <div class="demo-credentials">
+                <div class="demo-card">
+                    <p class="demo-title">Signer demo</p>
+                    <p><code>primary</code> / <code>primary123</code></p>
+                </div>
+                <div class="demo-card">
+                    <p class="demo-title">Reader demo</p>
+                    <p><code>secondary</code> / <code>secondary123</code></p>
+                </div>
+            </div>
+
+            <div class="feature-grid" id="feature-grid">
+                <div class="feature-card">
+                    <div class="feature-icon"><i class="fas fa-wave-square"></i></div>
+                    <div>
+                        <h4>Live waveform</h4>
+                        <p>ASL detections pulse in real time so you always know the engine is awake.</p>
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon"><i class="fas fa-shield-alt"></i></div>
+                    <div>
+                        <h4>Private sessions</h4>
+                        <p>Cookies stay scoped to this tab with secure defaults for both roles.</p>
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon"><i class="fas fa-video"></i></div>
+                    <div>
+                        <h4>Smooth video</h4>
+                        <p>WebRTC keeps the call fluid while the model runs locally for signers.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="gesture-basics">
+                <div class="gesture-header">
+                    <span class="dot"></span>
+                    <span>Hand gestures (A–D)</span>
+                    <a class="cheat-button" href="/tips">View full guide</a>
+                </div>
+                <div class="gesture-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon">👊</div>
+                        <div>
+                            <h4>A</h4>
+                            <p>Make a fist with thumb resting across the fingers.</p>
+                        </div>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🖐️</div>
+                        <div>
+                            <h4>B</h4>
+                            <p>Flat palm facing camera; thumb tucked across the palm.</p>
+                        </div>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🤏</div>
+                        <div>
+                            <h4>C</h4>
+                            <p>Curve fingers and thumb into a “C” shape facing the lens.</p>
+                        </div>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">☝️</div>
+                        <div>
+                            <h4>D</h4>
+                            <p>Index straight up; other fingers curled; thumb touches middle finger.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="role-cards">
+            <article class="role-card active" data-role-card="signer">
+                <div class="card-top">
+                    <span class="role-pill">Signer</span>
+                    <div class="live-wave">
+                        <span></span><span></span><span></span><span></span>
+                    </div>
+                </div>
+                <h3>Lead the conversation</h3>
+                <p class="card-copy">
+                    Share your camera, get instant skeleton overlays, and let the ASL model turn your gestures into text for your partner.
+                </p>
+                <ul class="card-points">
+                    <li><i class="fas fa-bolt"></i>Real-time inference on your device</li>
+                    <li><i class="fas fa-shield-alt"></i>Private session &amp; secure cookies</li>
+                    <li><i class="fas fa-wand-magic-sparkles"></i>Animated feedback while you sign</li>
+                </ul>
+                <div class="card-actions">
+                    <a class="arrow-link" href="/login?role=primary">Continue as signer</a>
+                    <span class="chip">Camera + mic enabled</span>
+                </div>
+            </article>
+
+            <article class="role-card" data-role-card="reader">
+                <div class="card-top">
+                    <span class="role-pill secondary">Reader</span>
+                    <div class="live-wave alt">
+                        <span></span><span></span><span></span><span></span>
+                    </div>
+                </div>
+                <h3>Follow every move</h3>
+                <p class="card-copy">
+                    Sit back with a synchronized video feed, see the detected letters arrive in real time, and keep the transcript handy.
+                </p>
+                <ul class="card-points">
+                    <li><i class="fas fa-eye"></i>Crystal-clear mirrored video</li>
+                    <li><i class="fas fa-closed-captioning"></i>Live transcript stream</li>
+                    <li><i class="fas fa-rocket"></i>Low-latency WebRTC transport</li>
+                </ul>
+                <div class="card-actions">
+                    <a class="arrow-link" href="/login?role=secondary">Continue as reader</a>
+                    <span class="chip secondary">Transcript mode</span>
+                </div>
+            </article>
+
+            <article class="role-card about-card" data-role-card="about">
+                <div class="card-top">
+                    <span class="role-pill secondary">About</span>
+                </div>
+                <h3>What is SignFlow?</h3>
+                <p class="card-copy">
+                    A lightweight ASL companion pairing a signer running on-device inference with a reader receiving synced video and transcript over WebRTC.
+                </p>
+                <ul class="card-points">
+                    <li><i class="fas fa-bolt"></i>FastAPI + TensorFlow model stays local for privacy.</li>
+                    <li><i class="fas fa-video"></i>WebRTC video for both roles; only signer processes gestures.</li>
+                    <li><i class="fas fa-shield-alt"></i>Secure sessions and ready-to-use demo accounts.</li>
+                </ul>
+                <div class="card-actions">
+                    <a class="arrow-link" href="/tips">View full gesture guide</a>
+                    <span class="chip secondary">Minimal & focused</span>
+                </div>
+            </article>
+
+        </section>
+    </main>
+
+    <script>
+        const statTargets = {
+            letters: [180, 360],
+            latency: [28, 75],
+            viewers: [1, 6]
+        };
+
+        function randomInRange([min, max]) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        function updateStats() {
+            document.querySelectorAll('[data-stat]').forEach(el => {
+                const key = el.dataset.stat;
+                if (!statTargets[key]) return;
+                const value = randomInRange(statTargets[key]);
+                el.textContent = key === 'latency' ? `${value} ms` : value;
+            });
+        }
+
+        const bars = document.querySelectorAll('.signal-bars .bar');
+        function animateBars() {
+            bars.forEach((bar, idx) => {
+                const height = 20 + Math.random() * 60;
+                const delay = idx * 60;
+                bar.animate([
+                    { height: `${height}%` },
+                    { height: `${height + 20}%` },
+                    { height: `${height - 10}%` }
+                ], {
+                    duration: 1200 + delay,
+                    iterations: 1,
+                    easing: 'ease-in-out'
+                });
+            });
+        }
+
+        const roleCards = document.querySelectorAll('[data-role-card]');
+        function selectRole(role) {
+            roleCards.forEach(card => {
+                const isMatch = card.dataset.roleCard === role;
+                card.classList.toggle('active', isMatch);
+            });
+        }
+
+        roleCards.forEach(card => {
+            card.addEventListener('pointerenter', () => selectRole(card.dataset.roleCard));
+            card.addEventListener('focusin', () => selectRole(card.dataset.roleCard));
+        });
+
+        document.querySelectorAll('[data-role-select]').forEach(btn => {
+            btn.addEventListener('mouseenter', () => selectRole(btn.dataset.roleSelect));
+            btn.addEventListener('focus', () => selectRole(btn.dataset.roleSelect));
+        });
+
+        document.addEventListener('pointermove', (event) => {
+            const root = document.documentElement;
+            root.style.setProperty('--mouse-x', `${event.clientX}px`);
+            root.style.setProperty('--mouse-y', `${event.clientY}px`);
+        });
+
+        // Session uptime + health sparkles
+        const sessionStart = Date.now();
+        const uptimeEl = document.getElementById('session-uptime');
+        const cheatGrid = document.getElementById('cheat-grid');
+        const cheatRotate = document.getElementById('cheat-rotate');
+        const detectionsList = document.getElementById('detections-list');
+        const latencyCanvas = document.getElementById('latency-chart');
+        const latencyCurrent = document.getElementById('latency-current');
+        const ctxLatency = latencyCanvas ? latencyCanvas.getContext('2d') : null;
+        const latencyData = [];
+        const maxLatencyPoints = 24;
+        const lettersPool = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z','Space','Next','Backspace'];
+
+        function formatUptime(ms) {
+            const totalSec = Math.floor(ms / 1000);
+            const h = Math.floor(totalSec / 3600).toString().padStart(2, '0');
+            const m = Math.floor((totalSec % 3600) / 60).toString().padStart(2, '0');
+            const s = (totalSec % 60).toString().padStart(2, '0');
+            return `${h}:${m}:${s}`;
+        }
+
+        let cheatIndex = 0;
+        function rotateCheats() {
+            if (!cheatGrid) return;
+            const cards = cheatGrid.querySelectorAll('.cheat-card');
+            cards.forEach(card => card.classList.remove('active'));
+            cheatIndex = (cheatIndex + 1) % cards.length;
+            cards[cheatIndex].classList.add('active');
+        }
+        if (cheatRotate) {
+            cheatRotate.addEventListener('click', rotateCheats);
+        }
+
+        setInterval(() => {
+            const elapsed = Date.now() - sessionStart;
+            if (uptimeEl) uptimeEl.textContent = `Uptime • ${formatUptime(elapsed)}`;
+        }, 1000);
+
+        setInterval(rotateCheats, 2200);
+
+        function addDetection() {
+            if (!detectionsList) return;
+            const letter = lettersPool[Math.floor(Math.random() * lettersPool.length)];
+            const confidence = (80 + Math.random() * 20).toFixed(0);
+            const latency = 40 + Math.random() * 80;
+            latencyData.push(latency);
+            if (latencyData.length > maxLatencyPoints) latencyData.shift();
+            latencyCurrent.textContent = `${Math.round(latency)} ms`;
+
+            const item = document.createElement('div');
+            item.className = 'detection-item';
+            item.innerHTML = `<span class="detection-letter">${letter}</span><span class="detection-conf">${confidence}%</span>`;
+            detectionsList.prepend(item);
+            while (detectionsList.children.length > 5) {
+                detectionsList.removeChild(detectionsList.lastChild);
+            }
+            drawLatency();
+        }
+
+        function drawLatency() {
+            if (!ctxLatency || !latencyData.length) return;
+            const w = latencyCanvas.width;
+            const h = latencyCanvas.height;
+            ctxLatency.clearRect(0, 0, w, h);
+            ctxLatency.strokeStyle = '#00d4ff';
+            ctxLatency.lineWidth = 2;
+            const maxVal = Math.max(...latencyData, 120);
+            const minVal = Math.min(...latencyData, 30);
+            ctxLatency.beginPath();
+            latencyData.forEach((v, i) => {
+                const x = (i / (maxLatencyPoints - 1)) * w;
+                const y = h - ((v - minVal) / (maxVal - minVal)) * h;
+                if (i === 0) ctxLatency.moveTo(x, y);
+                else ctxLatency.lineTo(x, y);
+            });
+            ctxLatency.stroke();
+        }
+
+        setInterval(addDetection, 1500);
+        addDetection();
+
+        setInterval(updateStats, 2600);
+        setInterval(animateBars, 1600);
+        updateStats();
+        animateBars();
+    </script>
+</body>
+</html>

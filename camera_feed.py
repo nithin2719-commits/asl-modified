@@ -735,8 +735,12 @@ async def predict_endpoint(data: dict, request: Request):
     return {"letter": letter, "sentence": sentence}
 
 @app.get("/", response_class=HTMLResponse)
-async def get(request: Request):
-    # Clear any existing session cookie on login page to avoid stale logins
+async def home(request: Request):
+    return templates.TemplateResponse("home.html", {"request": request})
+
+@app.get("/login", response_class=HTMLResponse)
+async def login_page(request: Request):
+    # Clear any existing session cookie on the login screen to avoid stale logins
     resp = templates.TemplateResponse("login.html", {"request": request})
     resp.delete_cookie("session")
     return resp
@@ -744,6 +748,10 @@ async def get(request: Request):
 @app.get("/signup", response_class=HTMLResponse)
 async def signup_page(request: Request):
     return templates.TemplateResponse("signup.html", {"request": request})
+
+@app.get("/tips", response_class=HTMLResponse)
+async def tips_page(request: Request):
+    return templates.TemplateResponse("tips.html", {"request": request})
 
 @app.get("/call", response_class=HTMLResponse)
 async def call(request: Request):
