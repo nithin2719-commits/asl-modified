@@ -28,9 +28,9 @@ app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 
 # TURN / STUN config from environment (for deployment flexibility)
-TURN_URLS = os.getenv("TURN_URLS", "")
-TURN_USER = os.getenv("TURN_USER", "")
-TURN_PASS = os.getenv("TURN_PASS", "")
+TURN_URLS = ""
+TURN_USER = ""
+TURN_PASS = ""
 STUN_URLS = os.getenv("STUN_URLS", "stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 

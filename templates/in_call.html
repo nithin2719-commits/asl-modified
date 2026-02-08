@@ -18,9 +18,9 @@
                 <div class="call-info">
                     <div class="brand-name-text">SignFlow</div>
                     <h2>ASL Video Call</h2>
-                    <div class="call-status">
-                        <span class="status-dot connected"></span>
-                        <span>Connected</span>
+                    <div class="call-status" id="call-status">
+                        <span class="status-dot" id="call-status-dot"></span>
+                        <span id="call-status-text">Waiting for peer…</span>
                     </div>
                 </div>
             </div>
@@ -29,17 +29,6 @@
                     <span class="pulse-dot"></span>
                     <i class="fas fa-hand-sparkles"></i>
                     <span>ASL engine</span>
-                </div>
-                <div class="mini-pill secure" id="e2ee-pill">
-                    <i class="fas fa-lock"></i>
-                    <span>E2EE pending</span>
-                </div>
-                <div class="fp-chip" id="fp-chip" hidden>
-                    <span class="fp-label">Fingerprint</span>
-                    <span class="fp-value" id="fp-value">—</span>
-                    <button class="fp-copy" type="button" id="fp-copy" title="Copy fingerprint">
-                        <i class="fas fa-copy"></i>
-                    </button>
                 </div>
                 <div class="mini-bars" aria-label="Signal quality">
                     <span></span><span></span><span></span><span></span><span></span>
@@ -77,7 +66,7 @@
 
                 <div class="call-stage">
                     <!-- Meet-like framed Video Canvas -->
-                    <div class="remote-video-container">
+                    <div class="remote-video-container call-panel">
                         <div class="interpreter-badge"><i class="fas fa-brain"></i> ASL Interpreter</div>
                         <video id="remote-peer" autoplay playsinline></video>
                         <!-- Local PIP -->
@@ -202,10 +191,8 @@
         const ROLE = "{{ username|default('')|lower }}";
         const controlPills = document.querySelectorAll('.control-pill');
         const supportsE2EE = !!(RTCRtpSender && RTCRtpSender.prototype.createEncodedStreams);
-        const e2eePill = document.getElementById('e2ee-pill');
-        const fpChip = document.getElementById('fp-chip');
-        const fpValue = document.getElementById('fp-value');
-        const fpCopy = document.getElementById('fp-copy');
+        const statusDot = document.getElementById('call-status-dot');
+        const statusText = document.getElementById('call-status-text');
 
         let localKeyPair = null;
         let e2eeKey = null;
@@ -218,6 +205,7 @@
         let isMuted = false;
         let isVideoOff = false;
         localVideo.classList.toggle('mirrored', mirrorCanvas);
+        setCallStatus('Waiting for peer…', 'connecting');
 
         // Button hover glow position
         controlPills.forEach(btn => {
@@ -460,6 +448,11 @@
                 if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
                     aslOutput.textContent = 'Connection lost. Reload to retry.';
                     try { pc.restartIce(); } catch (e) { console.warn('restartIce failed', e); }
+                    setCallStatus('Reconnecting…', 'connecting');
+                } else if (pc.connectionState === 'connecting') {
+                    setCallStatus('Connecting…', 'connecting');
+                } else if (pc.connectionState === 'connected') {
+                    setCallStatus('Connected', 'connected');
                 }
             });
 
@@ -495,6 +488,7 @@
                     if (supportsE2EE) {
                         protectReceiver(event.receiver);
                     }
+                    setCallStatus('Connected', 'connected');
                 }
                 if (remotePeerVideo.paused) {
                     remotePeerVideo.play().catch(() => {});
@@ -688,22 +682,11 @@
         }
 
         function setE2EEState(state, label) {
-            if (!e2eePill) return;
-            const text = e2eePill.querySelector('span');
-            if (text) text.textContent = label;
-            e2eePill.classList.toggle('off', state === 'off');
+            return; // E2EE pill removed from UI
         }
 
         function updateFingerprint(remoteJwk) {
-            if (!fpChip || !remoteJwk || !localKeyPair) return;
-            Promise.all([
-                crypto.subtle.exportKey('jwk', localKeyPair.publicKey),
-                Promise.resolve(remoteJwk)
-            ]).then(async ([localJwk, remoteJ]) => {
-                const hex = await computeFingerprint(localJwk, remoteJ);
-                fpValue.textContent = hex.slice(0, 18);
-                fpChip.hidden = false;
-            }).catch(err => console.warn('Fingerprint failed', err));
+            return; // fingerprint UI removed
         }
 
         async function computeFingerprint(localJwk, remoteJwk) {
@@ -713,16 +696,12 @@
             return [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('');
         }
 
-        if (fpCopy && fpValue) {
-            fpCopy.addEventListener('click', async () => {
-                try {
-                    await navigator.clipboard.writeText(fpValue.textContent);
-                    fpCopy.classList.add('copied');
-                    setTimeout(() => fpCopy.classList.remove('copied'), 900);
-                } catch (e) {
-                    console.warn('Copy fingerprint failed', e);
-                }
-            });
+        function setCallStatus(label, stateClass) {
+            if (statusText) statusText.textContent = label;
+            if (statusDot) {
+                statusDot.classList.remove('connected', 'connecting', 'disconnected');
+                if (stateClass) statusDot.classList.add(stateClass);
+            }
         }
     </script>
 </body>

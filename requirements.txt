@@ -29,8 +29,6 @@ h5py==3.15.1
 idna==3.11
 importlib_metadata==8.7.1
 importlib_resources==6.5.2
-jax==0.4.30
-jaxlib==0.4.30
 Jinja2==3.1.6
 keras==2.13.1
 Keras-Preprocessing==1.1.2
@@ -42,17 +40,15 @@ MarkupSafe==3.0.3
 matplotlib==3.9.4
 mdurl==0.1.2
 mediapipe==0.10.11
-ml_dtypes==0.5.4
 namex==0.1.0
 numpy==1.24.3
 oauthlib==3.3.1
 opencv-contrib-python==4.8.1.78
 opencv-python==4.8.1.78
 opt_einsum==3.4.0
-optree==0.18.0
 packaging==26.0
 pillow==10.4.0
-protobuf==4.25.8
+protobuf==3.20.3
 pyasn1==0.6.2
 pyasn1_modules==0.4.2
 pycparser==3.0
