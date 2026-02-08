@@ -30,6 +30,17 @@
                     <i class="fas fa-hand-sparkles"></i>
                     <span>ASL engine</span>
                 </div>
+                <div class="mini-pill secure" id="e2ee-pill">
+                    <i class="fas fa-lock"></i>
+                    <span>E2EE pending</span>
+                </div>
+                <div class="fp-chip" id="fp-chip" hidden>
+                    <span class="fp-label">Fingerprint</span>
+                    <span class="fp-value" id="fp-value">—</span>
+                    <button class="fp-copy" type="button" id="fp-copy" title="Copy fingerprint">
+                        <i class="fas fa-copy"></i>
+                    </button>
+                </div>
                 <div class="mini-bars" aria-label="Signal quality">
                     <span></span><span></span><span></span><span></span><span></span>
                 </div>
@@ -190,6 +201,17 @@
         const mirrorCanvas = true;
         const ROLE = "{{ username|default('')|lower }}";
         const controlPills = document.querySelectorAll('.control-pill');
+        const supportsE2EE = !!(RTCRtpSender && RTCRtpSender.prototype.createEncodedStreams);
+        const e2eePill = document.getElementById('e2ee-pill');
+        const fpChip = document.getElementById('fp-chip');
+        const fpValue = document.getElementById('fp-value');
+        const fpCopy = document.getElementById('fp-copy');
+
+        let localKeyPair = null;
+        let e2eeKey = null;
+        let e2eeKeyPromiseResolve = null;
+        const pendingSenders = new Set();
+        let remotePubJwk = null;
 
         let callStartTime = Date.now();
         let timerInterval;
@@ -414,21 +436,22 @@
                 return;
             }
 
+            const stunList = "{{ stun_urls|default('stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302') }}"
+                .split(',')
+                .map(u => u.trim())
+                .filter(Boolean)
+                .map(urls => ({ urls }));
+            const turnRaw = "{{ turn_urls|default('turn:openrelay.metered.ca:80,turn:openrelay.metered.ca:443,turn:openrelay.metered.ca:443?transport=tcp') }}";
+            const turnUser = "{{ turn_user|default('openrelayproject') }}";
+            const turnPass = "{{ turn_pass|default('openrelayproject') }}";
+            const turnEntries = turnRaw.split(',').map(u => u.trim()).filter(Boolean);
+            const iceServers = [...stunList];
+            if (turnEntries.length) {
+                iceServers.push({ urls: turnEntries, username: turnUser, credential: turnPass });
+            }
+
             pc = new RTCPeerConnection({
-                iceServers: [
-                    { urls: 'stun:stun.l.google.com:19302' },
-                    { urls: 'stun:stun1.l.google.com:19302' },
-                    // Public TURN for testing; replace with your own for reliability
-                    {
-                        urls: [
-                            'turn:openrelay.metered.ca:80',
-                            'turn:openrelay.metered.ca:443',
-                            'turn:openrelay.metered.ca:443?transport=tcp'
-                        ],
-                        username: 'openrelayproject',
-                        credential: 'openrelayproject'
-                    }
-                ],
+                iceServers,
                 iceTransportPolicy: 'all'
             });
 
@@ -440,8 +463,26 @@
                 }
             });
 
+            // Initialize E2EE (Insertable Streams)
+            if (supportsE2EE) {
+                setE2EEState('pending', 'E2EE pending');
+                initE2EEHandshake().catch(err => {
+                    console.warn('E2EE init failed', err);
+                    setE2EEState('off', 'E2EE unavailable');
+                });
+            } else {
+                console.warn('Insertable Streams not supported; skipping E2EE.');
+                setE2EEState('off', 'E2EE unavailable');
+            }
+
             // Send local tracks
-            stream.getTracks().forEach(track => pc.addTrack(track, stream));
+            stream.getTracks().forEach(track => {
+                const sender = pc.addTrack(track, stream);
+                if (supportsE2EE) {
+                    pendingSenders.add(sender);
+                    protectSender(sender);
+                }
+            });
 
             // Remote track handler
             pc.addEventListener('track', (event) => {
@@ -451,6 +492,9 @@
                 }
                 if (event.track) {
                     remoteStream.addTrack(event.track);
+                    if (supportsE2EE) {
+                        protectReceiver(event.receiver);
+                    }
                 }
                 if (remotePeerVideo.paused) {
                     remotePeerVideo.play().catch(() => {});
@@ -474,6 +518,106 @@
             if (ROLE === 'secondary') {
                 pollDetection();
             }
+        }
+
+        // --------- E2EE Helpers (Insertable Streams) ----------
+        async function initE2EEHandshake() {
+            localKeyPair = await crypto.subtle.generateKey(
+                { name: 'ECDH', namedCurve: 'P-256' },
+                true,
+                ['deriveKey']
+            );
+            const pubJwk = await crypto.subtle.exportKey('jwk', localKeyPair.publicKey);
+            const payload = { type: 'e2ee-key', pub: pubJwk };
+            if (!e2eeKeyPromiseResolve) {
+                e2eeKeyPromiseResolve = () => {};
+            }
+            sendSignal(payload);
+        }
+
+        async function ensureSharedKey(remotePubJwk) {
+            if (!supportsE2EE || !remotePubJwk || !localKeyPair) return;
+            const remotePubKey = await crypto.subtle.importKey(
+                'jwk',
+                remotePubJwk,
+                { name: 'ECDH', namedCurve: 'P-256' },
+                true,
+                []
+            );
+            e2eeKey = await crypto.subtle.deriveKey(
+                { name: 'ECDH', public: remotePubKey },
+                localKeyPair.privateKey,
+                { name: 'AES-GCM', length: 256 },
+                false,
+                ['encrypt', 'decrypt']
+            );
+            if (e2eeKeyPromiseResolve) e2eeKeyPromiseResolve(e2eeKey);
+            pendingSenders.forEach(protectSender);
+            setE2EEState('on', 'E2EE on');
+            updateFingerprint(remotePubJwk);
+        }
+
+        function getKeyPromise() {
+            if (e2eeKey) return Promise.resolve(e2eeKey);
+            return new Promise((resolve) => {
+                e2eeKeyPromiseResolve = resolve;
+            });
+        }
+
+        async function protectSender(sender) {
+            if (!supportsE2EE || !sender || sender._e2eeApplied) return;
+            if (!sender.createEncodedStreams) return;
+            if (!e2eeKey) await getKeyPromise();
+            const { readable, writable } = sender.createEncodedStreams();
+            const transform = new TransformStream({
+                async transform(chunk, controller) {
+                    try {
+                        const iv = crypto.getRandomValues(new Uint8Array(12));
+                        const cipher = await crypto.subtle.encrypt(
+                            { name: 'AES-GCM', iv },
+                            e2eeKey,
+                            chunk.data
+                        );
+                        const combined = new Uint8Array(iv.byteLength + cipher.byteLength);
+                        combined.set(iv, 0);
+                        combined.set(new Uint8Array(cipher), iv.byteLength);
+                        chunk.data = combined.buffer;
+                        controller.enqueue(chunk);
+                    } catch (err) {
+                        console.warn('Encrypt frame failed', err);
+                    }
+                }
+            });
+            readable.pipeThrough(transform).pipeTo(writable).catch(err => console.warn('Sender pipe failed', err));
+            sender._e2eeApplied = true;
+            pendingSenders.delete(sender);
+        }
+
+        async function protectReceiver(receiver) {
+            if (!supportsE2EE || !receiver || receiver._e2eeApplied) return;
+            if (!receiver.createEncodedStreams) return;
+            if (!e2eeKey) await getKeyPromise();
+            const { readable, writable } = receiver.createEncodedStreams();
+            const transform = new TransformStream({
+                async transform(chunk, controller) {
+                    try {
+                        const view = new Uint8Array(chunk.data);
+                        const iv = view.slice(0, 12);
+                        const cipher = view.slice(12);
+                        const plain = await crypto.subtle.decrypt(
+                            { name: 'AES-GCM', iv },
+                            e2eeKey,
+                            cipher
+                        );
+                        chunk.data = plain;
+                        controller.enqueue(chunk);
+                    } catch (err) {
+                        console.warn('Decrypt frame failed', err);
+                    }
+                }
+            });
+            readable.pipeThrough(transform).pipeTo(writable).catch(err => console.warn('Receiver pipe failed', err));
+            receiver._e2eeApplied = true;
         }
 
         // Secondary polls the server for latest detected letter/sentence from primary
@@ -537,7 +681,48 @@
                         console.error('addIceCandidate failed', err);
                     }
                 }
+            } else if (data.type === 'e2ee-key' && supportsE2EE) {
+                remotePubJwk = data.pub;
+                ensureSharedKey(data.pub).catch(err => console.warn('E2EE derive failed', err));
             }
+        }
+
+        function setE2EEState(state, label) {
+            if (!e2eePill) return;
+            const text = e2eePill.querySelector('span');
+            if (text) text.textContent = label;
+            e2eePill.classList.toggle('off', state === 'off');
+        }
+
+        function updateFingerprint(remoteJwk) {
+            if (!fpChip || !remoteJwk || !localKeyPair) return;
+            Promise.all([
+                crypto.subtle.exportKey('jwk', localKeyPair.publicKey),
+                Promise.resolve(remoteJwk)
+            ]).then(async ([localJwk, remoteJ]) => {
+                const hex = await computeFingerprint(localJwk, remoteJ);
+                fpValue.textContent = hex.slice(0, 18);
+                fpChip.hidden = false;
+            }).catch(err => console.warn('Fingerprint failed', err));
+        }
+
+        async function computeFingerprint(localJwk, remoteJwk) {
+            const concat = JSON.stringify([localJwk, remoteJwk].sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))));
+            const enc = new TextEncoder().encode(concat);
+            const digest = await crypto.subtle.digest('SHA-256', enc);
+            return [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        if (fpCopy && fpValue) {
+            fpCopy.addEventListener('click', async () => {
+                try {
+                    await navigator.clipboard.writeText(fpValue.textContent);
+                    fpCopy.classList.add('copied');
+                    setTimeout(() => fpCopy.classList.remove('copied'), 900);
+                } catch (e) {
+                    console.warn('Copy fingerprint failed', e);
+                }
+            });
         }
     </script>
 </body>

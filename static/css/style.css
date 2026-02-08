@@ -502,6 +502,66 @@ input:checked + .slider:before {
     box-shadow: 0 10px 24px rgba(0, 212, 255, 0.18);
 }
 
+.mini-pill.live {
+    background: rgba(0, 255, 174, 0.12);
+    border-color: rgba(0, 255, 174, 0.35);
+    color: #b3ffe6;
+}
+
+.mini-pill.secure {
+    background: rgba(0, 212, 255, 0.12);
+    border-color: rgba(0, 212, 255, 0.45);
+    color: #bde9ff;
+}
+
+.mini-pill.secure.off {
+    background: rgba(255, 71, 87, 0.12);
+    border-color: rgba(255, 71, 87, 0.4);
+    color: #ffc8d0;
+}
+
+.fp-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    color: #d8e9ff;
+    font-weight: 700;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.28);
+}
+
+.fp-label {
+    opacity: 0.75;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+}
+
+.fp-value {
+    font-family: "Space Grotesk", "Plus Jakarta Sans", monospace;
+    font-size: 0.9rem;
+}
+
+.fp-copy {
+    background: rgba(0, 212, 255, 0.12);
+    border: 1px solid rgba(0, 212, 255, 0.35);
+    color: #c2eaff;
+    border-radius: 10px;
+    width: 28px;
+    height: 28px;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.fp-copy:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 18px rgba(0, 212, 255, 0.25);
+}
+
 .mini-pill .pulse-dot {
     width: 9px;
     height: 9px;

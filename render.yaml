@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: signflow
+    env: python
+    plan: free
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "uvicorn camera_feed:app --host 0.0.0.0 --port $PORT --proxy-headers"
+    envVars:
+      - key: SECRET_KEY
+        sync: false   # set in Render dashboard
+      - key: TURN_URLS
+        sync: false   # e.g. turn:openrelay.metered.ca:80,turn:openrelay.metered.ca:443?transport=tcp
+      - key: TURN_USER
+        sync: false   # e.g. openrelayproject
+      - key: TURN_PASS
+        sync: false   # e.g. openrelayproject
+      - key: PYTHON_VERSION
+        value: "3.11"
+    disk:
+      name: data
+      mountPath: /data
+      sizeGB: 1

@@ -26,6 +26,12 @@ app = FastAPI()
 
 # Configure templates and static files
 templates = Jinja2Templates(directory="templates")
+
+# TURN / STUN config from environment (for deployment flexibility)
+TURN_URLS = os.getenv("TURN_URLS", "")
+TURN_USER = os.getenv("TURN_USER", "")
+TURN_PASS = os.getenv("TURN_PASS", "")
+STUN_URLS = os.getenv("STUN_URLS", "stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.get("/favicon.ico")
@@ -881,7 +887,17 @@ async def call(request: Request):
     if not user:
         return RedirectResponse(url="/", status_code=302)
     _reset_state()
-    return templates.TemplateResponse("in_call.html", {"request": request, "username": user[1]})
+    return templates.TemplateResponse(
+        "in_call.html",
+        {
+            "request": request,
+            "username": user[1],
+            "turn_urls": TURN_URLS,
+            "turn_user": TURN_USER,
+            "turn_pass": TURN_PASS,
+            "stun_urls": STUN_URLS,
+        },
+    )
 
 @app.post("/signup")
 async def signup(data: dict, response: Response):
