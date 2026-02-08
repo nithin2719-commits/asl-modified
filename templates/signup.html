@@ -28,8 +28,14 @@
         <div class="login-content">
             <div class="brand-section">
                 <div class="logo-container">
-                    <i class="fas fa-sign-language"></i>
-                    <h1 class="brand-name">SignFlow</h1>
+                    <div class="logo-orbital">
+                        <span class="orbital-ring"></span>
+                        <i class="fas fa-sign-language"></i>
+                    </div>
+                    <div>
+                        <h1 class="brand-name">SignFlow</h1>
+                        <p class="brand-sub">ASL Live Interpreter</p>
+                    </div>
                 </div>
                 <p class="brand-tagline">Create your SignFlow account</p>
                 <div class="brand-features">
@@ -46,15 +52,35 @@
                         <span>Saved Sessions</span>
                     </div>
                 </div>
+                <div class="live-badges">
+                    <span class="meta-pill"><span class="dot"></span> Choose your lane</span>
+                    <span class="meta-pill"><i class="fas fa-bolt"></i> Onboard faster</span>
+                    <span class="meta-pill"><i class="fas fa-shield-alt"></i> Private by default</span>
+                </div>
             </div>
 
             <div class="login-form-container">
                 <div class="form-header">
                     <h2>Create Account</h2>
                     <p>Use your email, username, and password to sign up</p>
+                    <div class="role-summary">Pick your role once; we'll remember it for login.</div>
                 </div>
 
                 <form id="signup-form" class="login-form">
+                    <div class="role-toggle" aria-label="Choose role">
+                        <button type="button" class="role-chip active" data-role-pick="primary">
+                            <i class="fas fa-hand-sparkles"></i>
+                            Signer
+                            <span class="chip-note">Camera + mic</span>
+                        </button>
+                        <button type="button" class="role-chip" data-role-pick="secondary">
+                            <i class="fas fa-eye"></i>
+                            Reader
+                            <span class="chip-note">Transcript mode</span>
+                        </button>
+                    </div>
+                    <input type="hidden" id="role-field" name="role" value="primary">
+
                     <div class="form-group">
                         <label for="email">
                             <i class="fas fa-envelope"></i>
@@ -109,6 +135,10 @@
         const togglePasswordBtn = document.getElementById('toggle-password');
         const passwordInput = document.getElementById('password');
         const signupHint = document.getElementById('signup-hint');
+        const roleChips = document.querySelectorAll('[data-role-pick]');
+        const roleField = document.getElementById('role-field');
+        const usernameInput = document.getElementById('username');
+        const emailInput = document.getElementById('email');
 
         signupForm.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -118,6 +148,7 @@
             const email = document.getElementById('email').value.trim();
             const username = document.getElementById('username').value.trim();
             const password = document.getElementById('password').value;
+            const role = roleField.value || 'primary';
 
             if (!email || !username || !password) {
                 signupHint.textContent = 'Please fill out all fields.';
@@ -129,14 +160,16 @@
                 const res = await fetch('/signup', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, username, password })
+                    body: JSON.stringify({ email, username, password, role })
                 });
                 const isJson = res.headers.get('content-type')?.includes('application/json');
                 const data = isJson ? await res.json() : { detail: await res.text() };
                 if (!res.ok) throw new Error(data.detail || 'Signup failed');
-                signupHint.textContent = `Account created. Your user id is ${data.user_id}. Redirecting...`;
+                localStorage.setItem('signflowRole', role);
+                localStorage.setItem('signflowLastUser', username);
+                signupHint.textContent = `Account created as ${role}. Redirecting to login...`;
                 signupHint.classList.add('show');
-                setTimeout(() => window.location.href = '/call', 500);
+                setTimeout(() => window.location.href = `/login?role=${role}`, 600);
             } catch (err) {
                 signupHint.textContent = err.message || 'Signup failed';
                 signupHint.classList.add('show');
@@ -147,6 +180,27 @@
             const isPassword = passwordInput.type === 'password';
             passwordInput.type = isPassword ? 'text' : 'password';
             togglePasswordBtn.innerHTML = isPassword ? '<i class="fas fa-eye-slash"></i>' : '<i class="fas fa-eye"></i>';
+        });
+
+        function applyRole(roleKey) {
+            roleChips.forEach(c => c.classList.toggle('active', c.dataset.rolePick === roleKey));
+            roleField.value = roleKey;
+            const hint = roleKey === 'primary'
+                ? 'Username example: signer_anna'
+                : 'Username example: reader_lee';
+            usernameInput.placeholder = hint;
+            if (!emailInput.value.includes('@')) {
+                emailInput.placeholder = roleKey === 'primary' ? 'signer@yourmail.com' : 'reader@yourmail.com';
+            }
+        }
+
+        const savedRole = localStorage.getItem('signflowRole');
+        applyRole(savedRole === 'secondary' ? 'secondary' : 'primary');
+
+        roleChips.forEach(chip => {
+            chip.addEventListener('click', () => {
+                applyRole(chip.dataset.rolePick);
+            });
         });
     </script>
 </body>

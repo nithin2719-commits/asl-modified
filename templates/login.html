@@ -31,10 +31,16 @@
             <!-- Logo and Branding -->
             <div class="brand-section">
                 <div class="logo-container">
-                    <i class="fas fa-sign-language"></i>
-                    <h1 class="brand-name">SignFlow</h1>
+                    <div class="logo-orbital">
+                        <span class="orbital-ring"></span>
+                        <i class="fas fa-sign-language"></i>
+                    </div>
+                    <div>
+                        <h1 class="brand-name">SignFlow</h1>
+                        <p class="brand-sub">ASL Live Interpreter</p>
+                    </div>
                 </div>
-                <p class="brand-tagline">Bridging Communication Through ASL</p>
+                <p class="brand-tagline">Meet the ASL login that feels alive.</p>
                 <div class="brand-features">
                     <div class="feature-item">
                         <i class="fas fa-video"></i>
@@ -50,17 +56,44 @@
                     </div>
                 </div>
 
+                <div class="live-badges">
+                    <span class="meta-pill"><span class="dot"></span> Edge inference</span>
+                    <span class="meta-pill"><i class="fas fa-shield-alt"></i> Encrypted session</span>
+                    <span class="meta-pill"><i class="fas fa-bolt"></i> Sub-100ms UI</span>
+                </div>
+
             </div>
 
             <!-- Login Form -->
             <div class="login-form-container">
+                <div class="glass-header">
+                    <div class="status-led"><span></span></div>
+                    <span class="glass-label">Access console</span>
+                    <div class="sparkline">
+                        <span></span><span></span><span></span><span></span><span></span>
+                    </div>
+                </div>
+
                 <div class="form-header">
                     <h2>Welcome Back</h2>
                     <p>Sign in to start your ASL conversation</p>
-                    <div class="role-context" id="role-context" aria-live="polite"></div>
+                </div>
+
+                <div class="role-toggle" aria-label="Choose role">
+                    <button type="button" class="role-chip active" data-role-pick="primary">
+                        <i class="fas fa-hand-sparkles"></i>
+                        Signer
+                        <span class="chip-note">Camera + mic</span>
+                    </button>
+                    <button type="button" class="role-chip" data-role-pick="secondary">
+                        <i class="fas fa-eye"></i>
+                        Reader
+                        <span class="chip-note">Transcript mode</span>
+                    </button>
                 </div>
 
                 <form id="login-form" class="login-form">
+                    <input type="hidden" id="role-field" name="role" value="primary">
                     <div class="form-group">
                         <label for="username">
                             <i class="fas fa-user"></i>
@@ -93,19 +126,44 @@
                         <a href="#" class="forgot-password">Forgot Password?</a>
                     </div>
 
-                    <button type="submit" class="login-btn">
-                        <span class="btn-text">Sign In</span>
-                        <i class="fas fa-arrow-right"></i>
-                    </button>
+                    <div class="button-grid">
+                        <button type="submit" class="login-btn">
+                            <span class="btn-text">Sign In</span>
+                            <i class="fas fa-arrow-right"></i>
+                        </button>
 
-                    <button type="button" class="signup-btn" id="signup-btn">
-                        <span class="btn-text">Create Account</span>
-                        <i class="fas fa-user-plus"></i>
-                    </button>
-
+                        <button type="button" class="signup-btn" id="signup-btn">
+                            <span class="btn-text">Create Account</span>
+                            <i class="fas fa-user-plus"></i>
+                        </button>
+                    </div>
                 </form>
 
                 <div class="login-hint" id="login-hint" aria-live="polite"></div>
+
+                <div class="login-timeline">
+                    <div class="tl-step">
+                        <span class="tl-dot"></span>
+                        <div>
+                            <p class="tl-title">Authenticate</p>
+                            <p class="tl-copy">Secure session spins up instantly.</p>
+                        </div>
+                    </div>
+                    <div class="tl-step">
+                        <span class="tl-dot"></span>
+                        <div>
+                            <p class="tl-title">Connect</p>
+                            <p class="tl-copy">We prep your camera and signaling stack.</p>
+                        </div>
+                    </div>
+                    <div class="tl-step">
+                        <span class="tl-dot"></span>
+                        <div>
+                            <p class="tl-title">Interpret</p>
+                            <p class="tl-copy">Letters stream live with glowing feedback.</p>
+                        </div>
+                    </div>
+                </div>
 
                 <div class="divider">
                     <span>or</span>
@@ -140,8 +198,13 @@
         const togglePasswordBtn = document.getElementById('toggle-password');
         const passwordInput = document.getElementById('password');
         const usernameInput = document.getElementById('username');
-        const roleContext = document.getElementById('role-context');
+        const roleContext = null;
+        const roleSummary = null;
         const loginHint = document.getElementById('login-hint');
+        const roleChips = document.querySelectorAll('[data-role-pick]');
+        const autofillButtons = document.querySelectorAll('[data-autofill]');
+        const roleField = document.getElementById('role-field');
+        const lastUser = localStorage.getItem('signflowLastUser');
 
         loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -165,19 +228,21 @@
                         body: JSON.stringify({ username, password })
                     });
                     const isJson = response.headers.get('content-type')?.includes('application/json');
-                    const result = isJson ? await response.json() : { detail: await response.text() };
-                    if (!response.ok) {
-                        throw new Error(result.detail || 'Login failed');
-                    }
-                    if (result.created) {
-                        loginHint.textContent = 'Account created automatically. Signing you in...';
-                        loginHint.classList.add('show');
-                    }
-                    window.location.href = '/call';
-                } catch (err) {
-                    loginHint.textContent = err.message || 'Login failed. Please try again.';
+                const result = isJson ? await response.json() : { detail: await response.text() };
+                if (!response.ok) {
+                    throw new Error(result.detail || 'Login failed');
+                }
+                if (result.created) {
+                    loginHint.textContent = 'Account created automatically. Signing you in...';
                     loginHint.classList.add('show');
-                } finally {
+                }
+                localStorage.setItem('signflowLastUser', username);
+                localStorage.setItem('signflowRole', roleField.value || 'primary');
+                window.location.href = '/call';
+            } catch (err) {
+                loginHint.textContent = err.message || 'Login failed. Please try again.';
+                loginHint.classList.add('show');
+            } finally {
                     btnText.textContent = 'Sign In';
                     btn.disabled = false;
                 }
@@ -214,13 +279,50 @@
             reader: { label: 'Reader', username: 'secondary', password: 'secondary123' }
         };
 
-        if (roleLookup[roleParam] && roleContext) {
-            const { label, username, password } = roleLookup[roleParam];
-            usernameInput.value = username;
-            passwordInput.placeholder = `${password} (demo)`;
-            roleContext.textContent = `You chose ${label.toLowerCase()} mode. Demo login: ${username} / ${password}`;
-            roleContext.classList.add('show');
+        function applyRole(roleKey, autofill = false) {
+            const info = roleLookup[roleKey];
+            if (!info) return;
+            roleChips.forEach(c => c.classList.toggle('active', c.dataset.rolePick === roleKey));
+            roleField.value = roleKey;
+            localStorage.setItem('signflowRole', roleKey);
+            if (autofill || !usernameInput.value) {
+                usernameInput.value = lastUser || info.username;
+            }
+            if (autofill || !passwordInput.value) {
+                passwordInput.value = '';
+                passwordInput.placeholder = `${info.password} (demo)`;
+            }
         }
+
+        const savedRole = localStorage.getItem('signflowRole');
+        if (roleLookup[roleParam]) {
+            applyRole(roleParam, false);
+        } else if (roleLookup[savedRole]) {
+            applyRole(savedRole, false);
+        } else {
+            applyRole('primary', false);
+        }
+
+        // Role chips (also fill credentials)
+        roleChips.forEach(chip => {
+            chip.addEventListener('click', () => {
+                const role = chip.dataset.rolePick;
+                applyRole(role, true);
+                passwordInput.focus();
+            });
+        });
+
+        // Quick autofill demo buttons
+        autofillButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const key = btn.dataset.autofill;
+                if (!roleLookup[key]) return;
+                applyRole(key, true);
+                const { password } = roleLookup[key];
+                passwordInput.value = password;
+                loginForm.classList.remove('shake');
+            });
+        });
 
         // Animated background effects
         document.addEventListener('mousemove', (e) => {

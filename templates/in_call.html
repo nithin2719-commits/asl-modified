@@ -102,13 +102,62 @@
         <!-- Camera Permission Prompt -->
         <div id="camera-prompt" class="camera-prompt">
             <div class="prompt-content">
-                <h3>Camera Access Required</h3>
-                <p>This app needs camera access to detect ASL signs.</p>
-                <button id="start-camera-btn" class="btn-primary">Allow Camera Access</button>
-                <p class="permission-help">
-                    Click "Allow" when your browser asks for camera permissions.<br>
-                    If blocked, click the camera icon in your browser's address bar.
-                </p>
+                <div class="prompt-aura"></div>
+                <div class="prompt-topline">
+                    <span class="pill trust"><i class="fas fa-lock"></i> Local-only</span>
+                    <span class="pill inline"><i class="fas fa-shield-alt"></i> Secure session</span>
+                </div>
+                <div class="prompt-hero">
+                    <div class="prompt-icon">
+                        <span class="icon-ring"></span>
+                        <i class="fas fa-video"></i>
+                    </div>
+                    <div>
+                        <p class="prompt-eyebrow">Permission handshake</p>
+                        <h3>Camera Access Required</h3>
+                        <p class="prompt-lede">SignFlow runs ASL detection on your device. Grant access so we can see your hands.</p>
+                    </div>
+                </div>
+
+                <div class="permission-steps">
+                    <div class="step">
+                        <span class="step-number">1</span>
+                        <div>
+                            <p class="step-title">Click "Allow" in your browser</p>
+                            <p class="step-copy">The prompt sits beside the address bar.</p>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <span class="step-number">2</span>
+                        <div>
+                            <p class="step-title">Stay in frame</p>
+                            <p class="step-copy">Keep your upper body centered for crisp tracking.</p>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <span class="step-number">3</span>
+                        <div>
+                            <p class="step-title">Keep it private</p>
+                            <p class="step-copy">Video stays local unless you're live in the call.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="prompt-actions">
+                    <button id="start-camera-btn" class="btn-primary allow-btn">
+                        <span class="btn-glow"></span>
+                        Allow Camera &amp; Start
+                    </button>
+                    <button type="button" class="help-toggle" id="permissions-help">
+                        Need help unblocking?
+                    </button>
+                </div>
+
+                <div class="help-panel" id="help-panel" hidden>
+                    <div class="help-item"><i class="fas fa-location-arrow"></i> Find the camera icon beside your address bar.</div>
+                    <div class="help-item"><i class="fas fa-shield-halved"></i> If blocked, set permission to "Allow" then refresh.</div>
+                    <div class="help-item"><i class="fas fa-sync"></i> Already allowed? Click "Allow Camera &amp; Start" again.</div>
+                </div>
             </div>
         </div>
     </div>
@@ -133,6 +182,8 @@
         const logoutBtn = document.getElementById('logout-btn');
         const cameraPrompt = document.getElementById('camera-prompt');
         const startCameraBtn = document.getElementById('start-camera-btn');
+        const helpToggle = document.getElementById('permissions-help');
+        const helpPanel = document.getElementById('help-panel');
         const miniBars = document.querySelectorAll('.mini-bars span');
         const telemetryBars = document.querySelectorAll('.telemetry-bars span');
         const liveLetter = document.getElementById('live-letter');
@@ -191,7 +242,7 @@
                 });
 
                 localVideo.srcObject = stream;
-                cameraPrompt.style.display = 'none';
+                cameraPrompt.classList.remove('visible');
                 startTimer();
                 startSignaling(stream);
                 if (ROLE === 'primary') {
@@ -221,7 +272,7 @@
                 }
 
                 aslOutput.textContent = errorMessage;
-                cameraPrompt.style.display = 'flex';
+                cameraPrompt.classList.add('visible');
             }
         }
 
@@ -230,6 +281,19 @@
             aslOutput.textContent = 'Requesting camera access...';
             initCamera();
         });
+
+        if (helpToggle && helpPanel) {
+            helpToggle.addEventListener('click', () => {
+                const isHidden = helpPanel.hasAttribute('hidden');
+                if (isHidden) {
+                    helpPanel.removeAttribute('hidden');
+                    helpToggle.textContent = 'Hide browser tips';
+                } else {
+                    helpPanel.setAttribute('hidden', '');
+                    helpToggle.textContent = 'Need help unblocking?';
+                }
+            });
+        }
 
         // ASL Detection
         async function startASLDetection() {
@@ -324,7 +388,7 @@
 
         // Initialize on page load - show camera prompt instead of auto-starting
         window.addEventListener('load', () => {
-            cameraPrompt.style.display = 'flex';
+            cameraPrompt.classList.add('visible');
             aslOutput.textContent = 'Click "Allow Camera Access" to start ASL recognition.';
         });
 
