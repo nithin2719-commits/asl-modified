@@ -1,10 +1,9 @@
 services:
   - type: web
     name: signflow
-    env: python
+    env: docker
     plan: free
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "uvicorn camera_feed:app --host 0.0.0.0 --port $PORT --proxy-headers"
+    dockerfilePath: Dockerfile
     envVars:
       - key: SECRET_KEY
         sync: false   # set in Render dashboard
@@ -14,5 +13,3 @@ services:
         sync: false   # e.g. openrelayproject
       - key: TURN_PASS
         sync: false   # e.g. openrelayproject
-      - key: PYTHON_VERSION
-        value: "3.11"
