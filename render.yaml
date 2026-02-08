@@ -16,7 +16,3 @@ services:
         sync: false   # e.g. openrelayproject
       - key: PYTHON_VERSION
         value: "3.11"
-    disk:
-      name: data
-      mountPath: /data
-      sizeGB: 1
