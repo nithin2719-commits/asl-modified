@@ -20,9 +20,6 @@ flatbuffers==25.12.19
 fonttools==4.60.2
 gast==0.4.0
 git-filter-repo==2.47.0
-google-auth==2.48.0
-google-auth-oauthlib==1.0.0
-google-pasta==0.2.0
 grpcio==1.74.0
 h11==0.16.0
 h5py==3.15.1
@@ -42,7 +39,6 @@ mdurl==0.1.2
 mediapipe==0.10.11
 namex==0.1.0
 numpy==1.24.3
-oauthlib==3.3.1
 opencv-contrib-python==4.8.1.78
 opencv-python==4.8.1.78
 opt_einsum==3.4.0
@@ -61,7 +57,6 @@ python-dateutil==2.9.0.post0
 pyttsx3==2.99
 pywin32==311
 requests==2.32.5
-requests-oauthlib==2.0.0
 rich==14.3.2
 rsa==4.9.1
 scipy==1.13.1

@@ -79,6 +79,10 @@
                     <p>Sign in to start your ASL conversation</p>
                 </div>
 
+                <div class="role-context show" id="role-context">
+                    Signer mode primed. Camera and mic will stay local to you.
+                </div>
+
                 <div class="role-toggle" aria-label="Choose role">
                     <button type="button" class="role-chip active" data-role-pick="primary">
                         <i class="fas fa-hand-sparkles"></i>
@@ -89,6 +93,13 @@
                         <i class="fas fa-eye"></i>
                         Reader
                         <span class="chip-note">Transcript mode</span>
+                    </button>
+                </div>
+
+                <div class="quick-actions demo-actions" aria-label="Demo shortcuts">
+                    <button type="button" class="quick-action ghost" id="back-home">
+                        <i class="fas fa-house"></i>
+                        Back home
                     </button>
                 </div>
 
@@ -132,53 +143,14 @@
                             <i class="fas fa-arrow-right"></i>
                         </button>
 
-                        <button type="button" class="signup-btn" id="signup-btn">
+                        <a class="signup-btn" id="signup-btn" href="/signup">
                             <span class="btn-text">Create Account</span>
                             <i class="fas fa-user-plus"></i>
-                        </button>
+                        </a>
                     </div>
                 </form>
 
                 <div class="login-hint" id="login-hint" aria-live="polite"></div>
-
-                <div class="login-timeline">
-                    <div class="tl-step">
-                        <span class="tl-dot"></span>
-                        <div>
-                            <p class="tl-title">Authenticate</p>
-                            <p class="tl-copy">Secure session spins up instantly.</p>
-                        </div>
-                    </div>
-                    <div class="tl-step">
-                        <span class="tl-dot"></span>
-                        <div>
-                            <p class="tl-title">Connect</p>
-                            <p class="tl-copy">We prep your camera and signaling stack.</p>
-                        </div>
-                    </div>
-                    <div class="tl-step">
-                        <span class="tl-dot"></span>
-                        <div>
-                            <p class="tl-title">Interpret</p>
-                            <p class="tl-copy">Letters stream live with glowing feedback.</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="divider">
-                    <span>or</span>
-                </div>
-
-                <div class="social-login">
-                    <button class="social-btn google-btn">
-                        <i class="fab fa-google"></i>
-                        Continue with Google
-                    </button>
-                    <button class="social-btn github-btn">
-                        <i class="fab fa-github"></i>
-                        Continue with GitHub
-                    </button>
-                </div>
 
                 <div class="signup-prompt">
                     <p>Don't have an account?
@@ -194,17 +166,15 @@
         // Form handling
         const loginForm = document.getElementById('login-form');
         const signupLink = document.getElementById('signup-link');
-        const signupBtn = document.getElementById('signup-btn');
         const togglePasswordBtn = document.getElementById('toggle-password');
         const passwordInput = document.getElementById('password');
         const usernameInput = document.getElementById('username');
-        const roleContext = null;
-        const roleSummary = null;
+        const roleContext = document.getElementById('role-context');
         const loginHint = document.getElementById('login-hint');
         const roleChips = document.querySelectorAll('[data-role-pick]');
-        const autofillButtons = document.querySelectorAll('[data-autofill]');
         const roleField = document.getElementById('role-field');
         const lastUser = localStorage.getItem('signflowLastUser');
+        const backHomeBtn = document.getElementById('back-home');
 
         loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -259,9 +229,11 @@
             window.location.href = '/signup';
         });
 
-        signupBtn.addEventListener('click', () => {
-            window.location.href = '/signup';
-        });
+        if (backHomeBtn) {
+            backHomeBtn.addEventListener('click', () => {
+                window.location.href = '/';
+            });
+        }
 
         togglePasswordBtn.addEventListener('click', () => {
             const isPassword = passwordInput.type === 'password';
@@ -272,25 +244,37 @@
         // Role-aware hints from the new homepage
         const params = new URLSearchParams(window.location.search);
         const roleParam = (params.get('role') || '').toLowerCase();
+        const userParam = params.get('user') || '';
         const roleLookup = {
-            primary: { label: 'Signer', username: 'primary', password: 'primary123' },
-            signer: { label: 'Signer', username: 'primary', password: 'primary123' },
-            secondary: { label: 'Reader', username: 'secondary', password: 'secondary123' },
-            reader: { label: 'Reader', username: 'secondary', password: 'secondary123' }
+            primary: { label: 'Signer', userPlaceholder: 'Enter signer username', passPlaceholder: 'Enter password' },
+            signer: { label: 'Signer', userPlaceholder: 'Enter signer username', passPlaceholder: 'Enter password' },
+            secondary: { label: 'Reader', userPlaceholder: 'Enter reader username', passPlaceholder: 'Enter password' },
+            reader: { label: 'Reader', userPlaceholder: 'Enter reader username', passPlaceholder: 'Enter password' }
         };
+
+        function normalizeRole(roleKey) {
+            if (roleKey === 'signer') return 'primary';
+            if (roleKey === 'reader') return 'secondary';
+            return roleKey;
+        }
 
         function applyRole(roleKey, autofill = false) {
             const info = roleLookup[roleKey];
             if (!info) return;
-            roleChips.forEach(c => c.classList.toggle('active', c.dataset.rolePick === roleKey));
-            roleField.value = roleKey;
-            localStorage.setItem('signflowRole', roleKey);
-            if (autofill || !usernameInput.value) {
-                usernameInput.value = lastUser || info.username;
+            const normalizedRole = normalizeRole(roleKey);
+            roleChips.forEach(c => c.classList.toggle('active', c.dataset.rolePick === normalizedRole));
+            roleField.value = normalizedRole;
+            localStorage.setItem('signflowRole', normalizedRole);
+            if (autofill && lastUser) {
+                usernameInput.value = lastUser;
+            } else if (!usernameInput.value) {
+                usernameInput.placeholder = info.userPlaceholder;
             }
-            if (autofill || !passwordInput.value) {
-                passwordInput.value = '';
-                passwordInput.placeholder = `${info.password} (demo)`;
+            passwordInput.placeholder = info.passPlaceholder;
+            if (roleContext) {
+                roleContext.textContent = normalizedRole === 'primary'
+                    ? 'Signer mode primed. Camera + mic stay on-device.'
+                    : 'Reader mode tuned for mirrored video and transcripts.';
             }
         }
 
@@ -303,6 +287,11 @@
             applyRole('primary', false);
         }
 
+        if (userParam && !usernameInput.value) {
+            usernameInput.value = userParam;
+        }
+
+
         // Role chips (also fill credentials)
         roleChips.forEach(chip => {
             chip.addEventListener('click', () => {
@@ -312,17 +301,26 @@
             });
         });
 
-        // Quick autofill demo buttons
-        autofillButtons.forEach(btn => {
-            btn.addEventListener('click', () => {
-                const key = btn.dataset.autofill;
-                if (!roleLookup[key]) return;
-                applyRole(key, true);
-                const { password } = roleLookup[key];
-                passwordInput.value = password;
-                loginForm.classList.remove('shake');
+        if (loginGoogle) {
+            loginGoogle.addEventListener('click', () => {
+                if (!googleEnabled) {
+                    loginHint.textContent = 'Google sign-in is not configured. Please use username/password.';
+                    loginHint.classList.add('show');
+                    return;
+                }
+                window.location.href = '/auth/google?flow=login&next=/call';
             });
-        });
+        }
+        if (loginGithub) {
+            loginGithub.addEventListener('click', () => {
+                if (!githubEnabled) {
+                    loginHint.textContent = 'GitHub sign-in is not configured. Please use username/password.';
+                    loginHint.classList.add('show');
+                    return;
+                }
+                window.location.href = '/auth/github?flow=login&next=/call';
+            });
+        }
 
         // Animated background effects
         document.addEventListener('mousemove', (e) => {

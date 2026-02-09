@@ -2,24 +2,24 @@ import os
 os.environ.setdefault("PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION", "python")
 os.environ.setdefault("PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION_VERSION", "3")
 
-from fastapi import FastAPI, Request, Response, HTTPException, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.responses import Response
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.templating import Jinja2Templates
-from fastapi.staticfiles import StaticFiles
-import cv2
-import numpy as np
 import base64
-from keras.models import load_model
-from cvzone.HandTrackingModule import HandDetector
+import hashlib
+import hmac
 import math
 import sqlite3
 import secrets
-import hashlib
-import hmac
 import time
 from typing import Dict, Optional
+
+import cv2
+import numpy as np
+from cvzone.HandTrackingModule import HandDetector
+from fastapi import FastAPI, HTTPException, Request, Response, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from keras.models import load_model
 from string import ascii_uppercase
 
 app = FastAPI()
@@ -57,9 +57,9 @@ offset = 45
 mirror_input = False  # keep original orientation for model consistency
 
 # Auth / DB
-DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "signflow.db")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, "signflow.db")
 SESSION_TTL_SECONDS = 60 * 60 * 12  # 12 hours
-
 def _db():
     return sqlite3.connect(DB_PATH, check_same_thread=False)
 
@@ -105,6 +105,20 @@ DEFAULT_ACCOUNTS = [
     {"username": "primary", "email": "primary@example.com", "password": "primary123"},
     {"username": "secondary", "email": "secondary@example.com", "password": "secondary123"},
 ]
+
+def _issue_session(user_id: int) -> str:
+    """Create a session token for the given user and persist it."""
+    token = secrets.token_urlsafe(32)
+    expires_at = int(time.time()) + SESSION_TTL_SECONDS
+    conn = _db()
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, ?)",
+        (token, user_id, expires_at)
+    )
+    conn.commit()
+    conn.close()
+    return token
 
 def _seed_default_users():
     """Ensure the primary/secondary hardcoded users exist."""

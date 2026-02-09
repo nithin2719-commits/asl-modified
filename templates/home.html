@@ -53,7 +53,7 @@
             <p class="eyebrow">ASL-first video calling</p>
             <h1>Are you signing or reading today?</h1>
             <p class="lede">
-                Pick your lane and we’ll tune the experience to you. Signers stream gestures with the model running locally;
+                Pick your lane and we'll tune the experience to you. Signers stream gestures with the model running locally;
                 readers get the live transcript with buttery WebRTC video.
             </p>
 
@@ -62,6 +62,7 @@
                     <span class="dot"></span>
                     <span>Live status</span>
                 </div>
+                <div class="hotkey-hint">Press <kbd>1</kbd> for Signer · <kbd>2</kbd> for Reader</div>
             </div>
 
             <div class="hero-ctas">
@@ -77,15 +78,18 @@
             <p class="cta-note">No account? <a href="/signup">Create one</a> or hop in with the demo credentials below.</p>
 
             <div class="demo-credentials">
-                <div class="demo-card">
+                <div class="demo-card" data-credential="primary|primary123">
                     <p class="demo-title">Signer demo</p>
                     <p><code>primary</code> / <code>primary123</code></p>
+                    <span class="demo-copy">Click to copy</span>
                 </div>
-                <div class="demo-card">
+                <div class="demo-card" data-credential="secondary|secondary123">
                     <p class="demo-title">Reader demo</p>
                     <p><code>secondary</code> / <code>secondary123</code></p>
+                    <span class="demo-copy">Click to copy</span>
                 </div>
             </div>
+            <div class="copy-toast" id="copy-toast" role="status" aria-live="polite">Copied!</div>
 
             <div class="feature-grid" id="feature-grid">
                 <div class="feature-card">
@@ -114,36 +118,50 @@
             <div class="gesture-basics">
                 <div class="gesture-header">
                     <span class="dot"></span>
-                    <span>Hand gestures (A–D)</span>
+                    <span>Hand gestures (A-F)</span>
                     <a class="cheat-button" href="/tips">View full guide</a>
                 </div>
                 <div class="gesture-grid">
                     <div class="feature-card">
-                        <div class="feature-icon">👊</div>
+                        <div class="feature-icon"><i class="fas fa-hand-fist"></i></div>
                         <div>
                             <h4>A</h4>
                             <p>Make a fist with thumb resting across the fingers.</p>
                         </div>
                     </div>
                     <div class="feature-card">
-                        <div class="feature-icon">✋</div>
+                        <div class="feature-icon"><i class="fas fa-hand"></i></div>
                         <div>
                             <h4>B</h4>
                             <p>Flat palm facing camera; thumb tucked across the palm.</p>
                         </div>
                     </div>
                     <div class="feature-card">
-                        <div class="feature-icon">🤏</div>
+                        <div class="feature-icon"><i class="fas fa-hand-sparkles"></i></div>
                         <div>
                             <h4>C</h4>
-                            <p>Curve fingers and thumb into a “C” shape facing the lens.</p>
+                            <p>Curve fingers and thumb into a "C" shape facing the lens.</p>
                         </div>
                     </div>
                     <div class="feature-card">
-                        <div class="feature-icon">☝️</div>
+                        <div class="feature-icon"><i class="fas fa-hand-point-up"></i></div>
                         <div>
                             <h4>D</h4>
                             <p>Index straight up; other fingers curled; thumb touches middle finger.</p>
+                        </div>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon"><i class="fas fa-hand-back-fist"></i></div>
+                        <div>
+                            <h4>E</h4>
+                            <p>Curve fingers into a compact fist; thumb rests across the fingertips.</p>
+                        </div>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon"><i class="fas fa-hand-pointer"></i></div>
+                        <div>
+                            <h4>F</h4>
+                            <p>Touch thumb to index to form a ring; other fingers lifted and relaxed.</p>
                         </div>
                     </div>
                 </div>
@@ -208,12 +226,125 @@
                     <li><i class="fas fa-video"></i>WebRTC video for both roles; only signer processes gestures.</li>
                     <li><i class="fas fa-shield-alt"></i>Secure sessions and ready-to-use demo accounts.</li>
                 </ul>
+                <div class="about-how">
+                    <p class="about-how-title"><i class="fas fa-diagram-project"></i>How it works</p>
+                    <div class="about-how-grid">
+                        <div class="about-step">
+                            <span class="about-step-id">1</span>
+                            <p class="about-step-title">Pick a role</p>
+                            <p class="about-step-copy">Signer streams hand motion. Reader opens transcript mode.</p>
+                        </div>
+                        <div class="about-step">
+                            <span class="about-step-id">2</span>
+                            <p class="about-step-title">Process live</p>
+                            <p class="about-step-copy">Frames are interpreted in real time on the signer's device.</p>
+                        </div>
+                        <div class="about-step">
+                            <span class="about-step-id">3</span>
+                            <p class="about-step-title">Deliver clearly</p>
+                            <p class="about-step-copy">Video and detected letters sync instantly for both people.</p>
+                        </div>
+                    </div>
+                </div>
                 <div class="card-actions">
                     <a class="arrow-link" href="/tips">View full gesture guide</a>
                     <span class="chip secondary">Minimal & focused</span>
                 </div>
             </article>
 
+        </section>
+
+        <section class="live-strip">
+            <article class="session-card live-preview">
+                <div class="session-header">
+                    <span class="session-pill" id="session-uptime">
+                        <span class="dot"></span>
+                        Uptime | 00:00:00
+                    </span>
+                    <div class="signal-bars" aria-hidden="true">
+                        <span class="bar"></span>
+                        <span class="bar"></span>
+                        <span class="bar"></span>
+                        <span class="bar"></span>
+                        <span class="bar"></span>
+                    </div>
+                </div>
+
+                <div class="stat-line">
+                    <div class="stat-pill">
+                        <p class="stat-label">Letters detected</p>
+                        <span class="stat-value" data-stat="letters">0</span>
+                    </div>
+                    <div class="stat-pill">
+                        <p class="stat-label">Glass-to-glass latency</p>
+                        <span class="stat-value" data-stat="latency">-- ms</span>
+                    </div>
+                    <div class="stat-pill">
+                        <p class="stat-label">Viewers in room</p>
+                        <span class="stat-value" data-stat="viewers">1</span>
+                    </div>
+                </div>
+
+                <div class="detection-card">
+                    <div class="detection-body">
+                        <div>
+                            <div class="strip-meta">
+                                <span class="dot"></span>
+                                <span>Live detections</span>
+                            </div>
+                            <div class="detections-list" id="detections-list" aria-live="polite"></div>
+                        </div>
+                        <div class="latency-wrap">
+                            <div class="latency-label">
+                                <span>Latency trend</span>
+                                <span id="latency-current">-- ms</span>
+                            </div>
+                            <canvas id="latency-chart" width="320" height="110" aria-label="Latency trend line"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </article>
+
+            <aside class="gesture-cheatsheet live-column">
+                <div class="cheat-header">
+                    <span class="dot"></span>
+                    <span class="cheat-title">Quick gesture cheats</span>
+                    <button class="cheat-button" id="cheat-rotate" type="button">Shuffle</button>
+                </div>
+                <div class="cheat-grid cheat-grid-compact" id="cheat-grid">
+                    <div class="cheat-card active">
+                        <div class="cheat-gesture">👋</div>
+                        <div>
+                            <p class="cheat-name">Wake the model</p>
+                            <p class="cheat-desc">Raise an open palm to confirm the engine is listening.</p>
+                        </div>
+                    </div>
+                    <div class="cheat-card">
+                        <div class="cheat-gesture">🤝</div>
+                        <div>
+                            <p class="cheat-name">Ground check</p>
+                            <p class="cheat-desc">Hold both hands steady for one second to reset tracking.</p>
+                        </div>
+                    </div>
+                    <div class="cheat-card">
+                        <div class="cheat-gesture">💡</div>
+                        <div>
+                            <p class="cheat-name">Light boost</p>
+                            <p class="cheat-desc">Tilt toward a lamp; the signal bars react instantly.</p>
+                        </div>
+                    </div>
+                    <div class="cheat-card">
+                        <div class="cheat-gesture">🌀</div>
+                        <div>
+                            <p class="cheat-name">Mirror flip</p>
+                            <p class="cheat-desc">Tap Ctrl/⌘ + M inside the call to mirror your feed.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="role-context show">
+                    Hover any role card or CTA to preview its vibe. Stats and detections above will keep pulsing live.
+                </div>
+            </aside>
         </section>
     </main>
 
@@ -223,6 +354,7 @@
             latency: [28, 75],
             viewers: [1, 6]
         };
+        const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
         function randomInRange([min, max]) {
             return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -239,6 +371,7 @@
 
         const bars = document.querySelectorAll('.signal-bars .bar');
         function animateBars() {
+            if (prefersReducedMotion.matches) return;
             bars.forEach((bar, idx) => {
                 const height = 20 + Math.random() * 60;
                 const delay = idx * 60;
@@ -271,17 +404,30 @@
             btn.addEventListener('mouseenter', () => selectRole(btn.dataset.roleSelect));
             btn.addEventListener('focus', () => selectRole(btn.dataset.roleSelect));
         });
-
-        document.addEventListener('pointermove', (event) => {
-            const root = document.documentElement;
-            root.style.setProperty('--mouse-x', `${event.clientX}px`);
-            root.style.setProperty('--mouse-y', `${event.clientY}px`);
+        // Keyboard hotkeys for quick role switching
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Digit1') selectRole('primary');
+            if (e.code === 'Digit2') selectRole('secondary');
+        });
+        // Keyboard hotkeys for quick role switching
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Digit1') selectRole('primary');
+            if (e.code === 'Digit2') selectRole('secondary');
         });
 
-        // Cursor glow
-        document.addEventListener('pointermove', (e) => {
-            document.documentElement.style.setProperty('--mx', `${(e.clientX / window.innerWidth) * 100}%`);
-            document.documentElement.style.setProperty('--my', `${(e.clientY / window.innerHeight) * 100}%`);
+        // Throttled cursor glow so we don't repaint on every pointer event
+        let pointerRAF = null;
+        document.addEventListener('pointermove', (event) => {
+            if (prefersReducedMotion.matches || pointerRAF) return;
+            const { clientX, clientY } = event;
+            pointerRAF = requestAnimationFrame(() => {
+                const root = document.documentElement;
+                root.style.setProperty('--mouse-x', `${clientX}px`);
+                root.style.setProperty('--mouse-y', `${clientY}px`);
+                root.style.setProperty('--mx', `${(clientX / window.innerWidth) * 100}%`);
+                root.style.setProperty('--my', `${(clientY / window.innerHeight) * 100}%`);
+                pointerRAF = null;
+            });
         });
 
         // Session uptime + health sparkles
@@ -296,6 +442,15 @@
         const latencyData = [];
         const maxLatencyPoints = 24;
         const lettersPool = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z','Space','Next','Backspace'];
+        const loops = {
+            uptime: null,
+            cheats: null,
+            detections: null,
+            stats: null,
+            bars: null
+        };
+        const copyToast = document.getElementById('copy-toast');
+        const demoCards = document.querySelectorAll('.demo-card[data-credential]');
 
         function formatUptime(ms) {
             const totalSec = Math.floor(ms / 1000);
@@ -317,15 +472,15 @@
             cheatRotate.addEventListener('click', rotateCheats);
         }
 
-        setInterval(() => {
+        function tickUptime() {
             const elapsed = Date.now() - sessionStart;
-            if (uptimeEl) uptimeEl.textContent = `Uptime • ${formatUptime(elapsed)}`;
-        }, 1000);
-
-        setInterval(rotateCheats, 2200);
+            if (uptimeEl) uptimeEl.textContent = `Uptime | ${formatUptime(elapsed)}`;
+        }
+        loops.uptime = setInterval(tickUptime, 1000);
+        tickUptime();
 
         function addDetection() {
-            if (!detectionsList) return;
+            if (!detectionsList || prefersReducedMotion.matches) return;
             const letter = lettersPool[Math.floor(Math.random() * lettersPool.length)];
             const confidence = (80 + Math.random() * 20).toFixed(0);
             const latency = 40 + Math.random() * 80;
@@ -344,7 +499,7 @@
         }
 
         function drawLatency() {
-            if (!ctxLatency || !latencyData.length) return;
+            if (!ctxLatency || !latencyData.length || prefersReducedMotion.matches) return;
             const w = latencyCanvas.width;
             const h = latencyCanvas.height;
             ctxLatency.clearRect(0, 0, w, h);
@@ -362,13 +517,68 @@
             ctxLatency.stroke();
         }
 
-        setInterval(addDetection, 1500);
-        addDetection();
+        function stopDynamicLoops() {
+            ['cheats','detections','stats','bars'].forEach(key => {
+                if (loops[key]) {
+                    clearInterval(loops[key]);
+                    loops[key] = null;
+                }
+            });
+        }
 
-        setInterval(updateStats, 2600);
-        setInterval(animateBars, 1600);
+        function startDynamicLoops() {
+            stopDynamicLoops();
+            if (prefersReducedMotion.matches || document.hidden) return;
+            loops.cheats = setInterval(rotateCheats, 2400);
+            loops.detections = setInterval(addDetection, 1700);
+            loops.stats = setInterval(updateStats, 3200);
+            loops.bars = setInterval(animateBars, 1800);
+            addDetection();
+            updateStats();
+            animateBars();
+        }
+
         updateStats();
         animateBars();
+        startDynamicLoops();
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                stopDynamicLoops();
+            } else {
+                startDynamicLoops();
+            }
+        });
+
+        prefersReducedMotion.addEventListener('change', () => {
+            if (prefersReducedMotion.matches) {
+                stopDynamicLoops();
+            } else if (!document.hidden) {
+                startDynamicLoops();
+            }
+        });
+
+        function showToast(msg) {
+            if (!copyToast) return;
+            copyToast.textContent = msg;
+            copyToast.classList.add('show');
+            setTimeout(() => copyToast.classList.remove('show'), 1600);
+        }
+
+        demoCards.forEach(card => {
+            card.addEventListener('click', async () => {
+                const cred = card.dataset.credential?.split('|');
+                if (!cred || cred.length !== 2) return;
+                const [user, pass] = cred;
+                const text = `${user} / ${pass}`;
+                try {
+                    await navigator.clipboard.writeText(text);
+                    showToast('Demo credentials copied');
+                } catch {
+                    showToast('Copy failed—select manually');
+                }
+            });
+        });
 
     </script>
 </body>
