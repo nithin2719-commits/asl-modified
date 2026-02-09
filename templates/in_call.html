@@ -57,6 +57,10 @@
                             <i class="fas fa-video"></i>
                             <span class="btn-label">Video</span>
                         </button>
+                        <button class="control-pill" id="asl-toggle-btn" title="Toggle ASL Interpreter">
+                            <i class="fas fa-hands"></i>
+                            <span class="btn-label">Start ASL</span>
+                        </button>
                         <button class="control-pill end-pill" id="end-call-btn" title="End Call">
                             <i class="fas fa-phone-slash"></i>
                             <span class="btn-label">End</span>
@@ -178,6 +182,9 @@
         const videoLabel = videoBtn.querySelector('.btn-label');
         const muteIcon = muteBtn.querySelector('i');
         const videoIcon = videoBtn.querySelector('i');
+        const aslToggleBtn = document.getElementById('asl-toggle-btn');
+        const aslToggleLabel = aslToggleBtn?.querySelector('.btn-label');
+        const aslToggleIcon = aslToggleBtn?.querySelector('i');
         const endCallBtn = document.getElementById('end-call-btn');
         const logoutBtn = document.getElementById('logout-btn');
         const cameraPrompt = document.getElementById('camera-prompt');
@@ -187,7 +194,9 @@
         const miniBars = document.querySelectorAll('.mini-bars span');
         const telemetryBars = document.querySelectorAll('.telemetry-bars span');
         const liveLetter = document.getElementById('live-letter');
-        const mirrorCanvas = true;
+        // Keep preview mirrored for the user, but send unmirrored frames so
+        // backend flip matches desktop final_pred.py orientation.
+        const mirrorCanvas = false;
         const ROLE = "{{ username|default('')|lower }}";
         const controlPills = document.querySelectorAll('.control-pill');
         const supportsE2EE = !!(RTCRtpSender && RTCRtpSender.prototype.createEncodedStreams);
@@ -204,7 +213,14 @@
         let timerInterval;
         let isMuted = false;
         let isVideoOff = false;
-        localVideo.classList.toggle('mirrored', mirrorCanvas);
+        let aslEnabled = false;
+        let detectLoopActive = false;
+        let detectLoopTimer = null;
+        let detectFailures = 0;
+        const DETECT_INTERVAL_MS = 50;
+        const DETECT_TIMEOUT_MS = 1800;
+        const MAX_DETECT_FAILURES = 4;
+        localVideo.classList.toggle('mirrored', true);
         setCallStatus('Waiting for peer…', 'connecting');
 
         // Button hover glow position
@@ -221,6 +237,15 @@
             el.classList.remove('flash');
             void el.offsetWidth;
             el.classList.add('flash');
+        }
+
+        function setASLToggleState(on) {
+            aslEnabled = !!on;
+            if (!aslToggleBtn || !aslToggleLabel || !aslToggleIcon) return;
+            aslToggleBtn.classList.toggle('active', aslEnabled);
+            aslToggleBtn.classList.toggle('pill-off', !aslEnabled);
+            aslToggleLabel.textContent = aslEnabled ? 'Stop ASL' : 'Start ASL';
+            aslToggleIcon.className = aslEnabled ? 'fas fa-hand' : 'fas fa-hands';
         }
 
         // Start call timer
@@ -256,16 +281,16 @@
                 startTimer();
                 startSignaling(stream);
                 if (ROLE === 'primary') {
-                    startASLDetection();
+                    setASLToggleState(false);
+                    aslOutput.textContent = 'Camera connected. Press Start ASL to begin interpreter.';
+                    if (aslToggleBtn) aslToggleBtn.disabled = false;
                 } else {
                     aslOutput.textContent = 'Viewer mode: ASL prediction off.';
+                    if (aslToggleBtn) {
+                        aslToggleBtn.disabled = true;
+                        if (aslToggleLabel) aslToggleLabel.textContent = 'ASL Off';
+                    }
                 }
-
-                // Show success message
-                aslOutput.textContent = 'Camera connected! Ready for ASL detection.';
-                setTimeout(() => {
-                    aslOutput.textContent = 'Ready for ASL detection...';
-                }, 2000);
 
             } catch (error) {
                 console.error('Error accessing camera:', error);
@@ -305,36 +330,74 @@
             });
         }
 
+        function stopASLDetection() {
+            detectLoopActive = false;
+            if (detectLoopTimer) {
+                clearTimeout(detectLoopTimer);
+                detectLoopTimer = null;
+            }
+            setASLToggleState(false);
+        }
+
         // ASL Detection
         async function startASLDetection() {
             const stream = localVideo.srcObject;
-            if (!stream) return;
+            if (!stream || detectLoopActive || !aslEnabled) return;
 
-            let inFlight = false;
-            const interval = setInterval(async () => {
-                if (inFlight) return;
-                if (localVideo.videoWidth === 0) return;
+            detectLoopActive = true;
+            detectFailures = 0;
 
-                ctx.save();
-                if (mirrorCanvas) {
-                    ctx.translate(canvas.width, 0);
-                    ctx.scale(-1, 1);
+            const scheduleNext = () => {
+                if (!detectLoopActive || !aslEnabled) return;
+                detectLoopTimer = setTimeout(detectionTick, DETECT_INTERVAL_MS);
+            };
+
+            const detectionTick = async () => {
+                if (!detectLoopActive || !aslEnabled) return;
+                if (localVideo.videoWidth === 0) {
+                    scheduleNext();
+                    return;
                 }
-                ctx.drawImage(localVideo, 0, 0, canvas.width, canvas.height);
-                ctx.restore();
-                const imageData = canvas.toDataURL('image/jpeg', 0.5);
 
                 try {
-                    inFlight = true;
-                    const response = await fetch('/predict', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({ image: imageData })
+                    ctx.save();
+                    if (mirrorCanvas) {
+                        ctx.translate(canvas.width, 0);
+                        ctx.scale(-1, 1);
+                    }
+                    ctx.drawImage(localVideo, 0, 0, canvas.width, canvas.height);
+                    ctx.restore();
+
+                    // Send raw JPEG bytes (faster than base64 JSON payloads).
+                    const blob = await new Promise((resolve) => {
+                        canvas.toBlob(resolve, 'image/jpeg', 0.5);
                     });
+                    if (!blob) {
+                        detectFailures += 1;
+                        return;
+                    }
+
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), DETECT_TIMEOUT_MS);
+                    let response;
+                    try {
+                        response = await fetch('/predict', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'image/jpeg' },
+                            body: blob,
+                            signal: controller.signal
+                        });
+                    } finally {
+                        clearTimeout(timeoutId);
+                    }
+
+                    if (!response.ok) {
+                        throw new Error(`predict_failed_${response.status}`);
+                    }
 
                     const result = await response.json();
+                    detectFailures = 0;
+
                     if (result.letter) {
                         aslOutput.textContent = `Detected: ${result.letter}`;
                         liveLetter.textContent = result.letter;
@@ -345,11 +408,43 @@
                         aslSentence.textContent = `Sentence: ${result.sentence}`;
                     }
                 } catch (error) {
-                    console.error('Error detecting ASL:', error);
+                    detectFailures += 1;
+                    if (error.name !== 'AbortError') {
+                        console.error('Error detecting ASL:', error);
+                    }
+                    if (detectFailures >= MAX_DETECT_FAILURES) {
+                        detectFailures = 0;
+                        aslOutput.textContent = 'Reconnecting ASL tracker...';
+                        fetch('/reset_state', { method: 'POST' }).catch(() => {});
+                    }
                 } finally {
-                    inFlight = false;
+                    scheduleNext();
                 }
-            }, 80); // Faster detection
+            };
+
+            detectionTick();
+        }
+
+        if (aslToggleBtn) {
+            aslToggleBtn.disabled = true;
+            aslToggleBtn.addEventListener('click', () => {
+                if (ROLE !== 'primary') return;
+                const stream = localVideo.srcObject;
+                if (!stream) {
+                    aslOutput.textContent = 'Start camera first, then press Start ASL.';
+                    cameraPrompt.classList.add('visible');
+                    return;
+                }
+                if (detectLoopActive) {
+                    stopASLDetection();
+                    aslOutput.textContent = 'ASL interpreter paused.';
+                    liveLetter.textContent = 'Paused';
+                    return;
+                }
+                setASLToggleState(true);
+                aslOutput.textContent = 'ASL interpreter running...';
+                startASLDetection();
+            });
         }
 
         // Control buttons
@@ -380,6 +475,7 @@
         });
 
         endCallBtn.addEventListener('click', () => {
+            stopASLDetection();
             if (localVideo.srcObject) {
                 localVideo.srcObject.getTracks().forEach(track => track.stop());
             }
@@ -388,6 +484,7 @@
         });
 
         logoutBtn.addEventListener('click', async () => {
+            stopASLDetection();
             try {
                 await fetch('/logout', { method: 'POST' });
             } catch (e) {
@@ -703,6 +800,14 @@
                 if (stateClass) statusDot.classList.add(stateClass);
             }
         }
+
+        // Quick keyboard shortcuts for controls
+        document.addEventListener('keydown', (e) => {
+            if (e.repeat) return;
+            if (e.key.toLowerCase() === 'm') document.getElementById('mute-btn')?.click();
+            if (e.key.toLowerCase() === 'v') document.getElementById('video-btn')?.click();
+            if (e.key.toLowerCase() === 'q') document.getElementById('end-call-btn')?.click();
+        });
     </script>
 </body>
 </html>
