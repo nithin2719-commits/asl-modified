@@ -27,10 +27,16 @@ app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 
 # TURN / STUN config from environment (for deployment flexibility)
-TURN_URLS = ""
-TURN_USER = ""
-TURN_PASS = ""
-STUN_URLS = os.getenv("STUN_URLS", "stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302")
+TURN_URLS = os.getenv(
+    "TURN_URLS",
+    "turn:openrelay.metered.ca:80,turn:openrelay.metered.ca:443,turn:openrelay.metered.ca:443?transport=tcp",
+)
+TURN_USER = os.getenv("TURN_USER", "openrelayproject")
+TURN_PASS = os.getenv("TURN_PASS", "openrelayproject")
+STUN_URLS = os.getenv(
+    "STUN_URLS",
+    "stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302"
+)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.get("/favicon.ico")
@@ -849,12 +855,15 @@ async def call(request: Request):
     user = _get_user_from_session(token)
     if not user:
         return RedirectResponse(url="/", status_code=302)
+    # Map arbitrary usernames to the two signaling roles expected by the client
+    role = "primary" if user[1].lower() == "primary" else "secondary"
     _reset_state()
     return templates.TemplateResponse(
         "in_call.html",
         {
             "request": request,
             "username": user[1],
+            "role": role,
             "turn_urls": TURN_URLS,
             "turn_user": TURN_USER,
             "turn_pass": TURN_PASS,

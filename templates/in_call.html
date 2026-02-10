@@ -20,7 +20,7 @@
                     <h2>ASL Video Call</h2>
                     <div class="call-status" id="call-status">
                         <span class="status-dot" id="call-status-dot"></span>
-                        <span id="call-status-text">Waiting for peer…</span>
+                        <span id="call-status-text">Waiting for peer...</span>
                     </div>
                 </div>
             </div>
@@ -197,7 +197,7 @@
         // Keep preview mirrored for the user, but send unmirrored frames so
         // backend flip matches desktop final_pred.py orientation.
         const mirrorCanvas = false;
-        const ROLE = "{{ username|default('')|lower }}";
+        const ROLE = "{{ role|default('secondary') }}";
         const controlPills = document.querySelectorAll('.control-pill');
         const supportsE2EE = !!(RTCRtpSender && RTCRtpSender.prototype.createEncodedStreams);
         const statusDot = document.getElementById('call-status-dot');
@@ -221,7 +221,7 @@
         const DETECT_TIMEOUT_MS = 1800;
         const MAX_DETECT_FAILURES = 4;
         localVideo.classList.toggle('mirrored', true);
-        setCallStatus('Waiting for peer…', 'connecting');
+        setCallStatus('Waiting for peer...', 'connecting');
 
         // Button hover glow position
         controlPills.forEach(btn => {
@@ -521,14 +521,14 @@
                 return;
             }
 
-            const stunList = "{{ stun_urls|default('stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302') }}"
+            const stunList = "{{ stun_urls|default('stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302', true) }}"
                 .split(',')
                 .map(u => u.trim())
                 .filter(Boolean)
                 .map(urls => ({ urls }));
-            const turnRaw = "{{ turn_urls|default('turn:openrelay.metered.ca:80,turn:openrelay.metered.ca:443,turn:openrelay.metered.ca:443?transport=tcp') }}";
-            const turnUser = "{{ turn_user|default('openrelayproject') }}";
-            const turnPass = "{{ turn_pass|default('openrelayproject') }}";
+            const turnRaw = "{{ turn_urls|default('turn:openrelay.metered.ca:80,turn:openrelay.metered.ca:443,turn:openrelay.metered.ca:443?transport=tcp', true) }}";
+            const turnUser = "{{ turn_user|default('openrelayproject', true) }}";
+            const turnPass = "{{ turn_pass|default('openrelayproject', true) }}";
             const turnEntries = turnRaw.split(',').map(u => u.trim()).filter(Boolean);
             const iceServers = [...stunList];
             if (turnEntries.length) {
