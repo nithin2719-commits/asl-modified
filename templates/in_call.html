@@ -68,11 +68,11 @@
                     </div>
                 </div>
 
-                <div class="call-stage">
-                    <!-- Meet-like framed Video Canvas -->
-                    <div class="remote-video-container call-panel">
-                        <div class="interpreter-badge"><i class="fas fa-brain"></i> ASL Interpreter</div>
-                        <video id="remote-peer" autoplay playsinline></video>
+            <div class="call-stage">
+                <!-- Meet-like framed Video Canvas -->
+                <div class="remote-video-container call-panel">
+                    <!-- Interpreter badge hidden per request -->
+                    <video id="remote-peer" autoplay playsinline></video>
                         <!-- Local PIP -->
                         <div class="local-video-bubble">
                             <video id="local-video" autoplay muted playsinline></video>
@@ -90,11 +90,12 @@
                                 <span id="live-letter">Listening...</span>
                             </div>
                         </div>
-                        <div class="participant-info">
-                            <div class="participant-name">ASL Interpreter</div>
-                            <div class="asl-output" id="asl-output">Ready for ASL detection...</div>
-                            <div class="asl-sentence" id="asl-sentence">Sentence: </div>
-                        </div>
+                    </div>
+
+                    <div class="participant-info">
+                        <div class="participant-name">ASL Interpreter</div>
+                        <div class="asl-output" id="asl-output">Ready for ASL detection...</div>
+                        <div class="asl-sentence" id="asl-sentence">Sentence: </div>
                     </div>
                 </div>
             </div>
@@ -385,13 +386,19 @@
                             method: 'POST',
                             headers: { 'Content-Type': 'image/jpeg' },
                             body: blob,
-                            signal: controller.signal
+                            signal: controller.signal,
+                            credentials: 'include',
+                            cache: 'no-store'
                         });
                     } finally {
                         clearTimeout(timeoutId);
                     }
 
                     if (!response.ok) {
+                        if (response.status === 401) {
+                            aslOutput.textContent = 'Session expired. Please log in again to resume ASL.';
+                            stopASLDetection();
+                        }
                         throw new Error(`predict_failed_${response.status}`);
                     }
 
