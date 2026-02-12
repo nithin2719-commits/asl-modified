@@ -1740,65 +1740,27 @@ input:checked + .slider:before {
 /* Login Form Enhancements */
 .login-form-container {
     flex: 1;
-    background: rgba(10, 12, 24, 0.75);
-    border: 1px solid rgba(0, 212, 255, 0.2);
+    background: linear-gradient(160deg, rgba(18, 36, 68, 0.96), rgba(10, 20, 42, 0.94));
+    border: 1px solid rgba(120, 170, 255, 0.16);
     border-radius: 20px;
     padding: 35px;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 22px 64px rgba(0, 0, 0, 0.40);
     backdrop-filter: blur(12px);
     transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
 .login-form-container:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 30px 70px rgba(0, 0, 0, 0.45);
+    transform: translateY(-2px);
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.42);
 }
 
-.glass-header {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 14px;
-    border-radius: 12px;
-    background: linear-gradient(120deg, rgba(255, 255, 255, 0.06), rgba(0, 212, 255, 0.08));
-    border: 1px solid rgba(0, 212, 255, 0.18);
-    margin-bottom: 14px;
-}
-
-.glass-label {
-    color: #d8ecff;
-    font-weight: 700;
-    letter-spacing: 0.01em;
-}
-
-.status-led span {
-    display: inline-block;
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    background: radial-gradient(circle, #00ffae, #00d4ff);
-    box-shadow: 0 0 12px rgba(0, 255, 174, 0.7);
-    animation: pulse 1.8s ease-in-out infinite;
-}
-
+/* Removed glass header/sparkline on login card */
+.glass-header,
+.glass-label,
+.status-led,
 .sparkline {
-    display: grid;
-    grid-template-columns: repeat(5, 6px);
-    gap: 6px;
-    margin-left: auto;
+    display: none !important;
 }
-
-.sparkline span {
-    height: 14px;
-    background: linear-gradient(180deg, #00d4ff, rgba(0, 212, 255, 0.2));
-    border-radius: 6px;
-    animation: spark 1.4s ease-in-out infinite;
-}
-
-.sparkline span:nth-child(2) { animation-delay: 0.1s; }
-.sparkline span:nth-child(3) { animation-delay: 0.2s; }
-.sparkline span:nth-child(4) { animation-delay: 0.3s; }
-.sparkline span:nth-child(5) { animation-delay: 0.4s; }
 
 .form-header h2 {
     font-size: 2rem;
@@ -2027,18 +1989,51 @@ input:checked + .slider:before {
 body.home-page {
     --home-cyan: #00d4ff;
     --home-purple: #6a5cff;
-    --home-surface: rgba(13, 17, 31, 0.75);
+    --home-surface: rgba(14, 16, 26, 0.82);
     --mx: 50%;
     --my: 50%;
     background:
-        radial-gradient(circle at 18% 22%, rgba(0, 160, 255, 0.13), transparent 26%),
-        radial-gradient(circle at 80% 16%, rgba(60, 110, 255, 0.15), transparent 32%),
-        radial-gradient(circle at 12% 78%, rgba(0, 180, 255, 0.10), transparent 30%),
-        linear-gradient(150deg, #010109 0%, #040615 48%, #010109 100%);
-    background-attachment: fixed;
+        radial-gradient(circle at 18% 22%, rgba(70, 110, 210, 0.38) 0%, transparent 44%),
+        linear-gradient(135deg, #070c1c 0%, #0b1a38 42%, #0f2855 100%);
     color: #e9f3ff;
     overflow-x: hidden;
     position: relative;
+}
+
+/* Home: force static background, remove animated/decor layers */
+.home-visuals,
+.home-aurora,
+.floating-orbs,
+.beams,
+.rings,
+.scanlines,
+.dust {
+    display: none !important;
+    background: none !important;
+    animation: none !important;
+}
+
+body.home-page::before,
+body.home-page::after,
+.home-visuals::before,
+.home-visuals::after {
+    display: none !important;
+    content: none !important;
+    background: none !important;
+    animation: none !important;
+}
+
+.home-grid {
+    position: static !important;
+    inset: auto !important;
+    background: none !important;
+    animation: none !important;
+}
+
+.home-nav::before {
+    display: none !important;
+    content: none !important;
+    background: none !important;
 }
 
 .home-page .container {
@@ -2915,7 +2910,7 @@ body.home-page {
 
 .detection-card .detection-body {
     display: grid;
-    grid-template-columns: 1fr 280px;
+    grid-template-columns: 1fr 0.9fr;
     gap: 14px;
 }
 
@@ -2925,7 +2920,7 @@ body.home-page {
 }
 
 .detections-list:empty::after {
-    content: "Waiting for motionâ€¦";
+    content: "Waiting for detections…€¦";
     padding: 12px;
     border-radius: 12px;
     background: rgba(255, 255, 255, 0.04);
@@ -4014,3 +4009,35 @@ body.home-page {
         padding: 12px;
     }
 }
+
+.notes-wrap {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 12px 14px;
+}
+
+.notes-wrap .latency-label {
+    margin-bottom: 6px;
+}
+
+.session-notes {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 8px;
+}
+
+.session-notes li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #d9e6ff;
+    font-weight: 600;
+}
+
+.session-notes i {
+    color: #7fb1ff;
+}
+
