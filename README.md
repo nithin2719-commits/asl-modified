@@ -1,44 +1,32 @@
 # SignFlow - ASL Video Call & Interpreter
 
-SignFlow is a FastAPI + WebRTC web app that turns a browser video call into a live ASL interpreter. As of **February 6, 2026** the system recognizes ASL alphabet letters (A-Z) with helper gestures (space / next / backspace). A simplified gesture set for common phrases is on the near-term roadmap.
+Updated February 11, 2026 — SignFlow is a FastAPI + WebRTC app that turns a two‑party video call into a live ASL interpreter. The signer runs on-device inference; the reader sees a synced transcript and video feed.
 
-## What This Project Does
-- Runs a browser-based call between two roles: `primary` (signer) and `secondary` (viewer).
-- Captures the primary user's camera, extracts hand landmarks with cvzone/MediaPipe, draws a skeleton frame, and classifies it with `cnn8grps_rad1_model.h5` (TensorFlow 2.13).
-- Smooths predictions, converts them into characters, and builds a sentence with gesture controls:
-  - `next` commits the previous stable letter to the sentence.
-  - `Backspace` removes the last character.
-  - A relaxed closed-hand gesture inserts a space.
-- Shares the current letter + sentence with the secondary user in real time over HTTP polling (with WebRTC media transport).
-- Provides signup/login, PBKDF2 password hashing, session cookies, and default demo accounts.
+## Highlights
+- New animated landing page at `/` with role selector and copy-to-clipboard demo credentials.
+- Role-aware auth flow: email + username + password, PBKDF2-SHA256 (200k rounds) with per-user salt, 12h session cookie, default demo accounts seeded.
+- ASL alphabet (A–Z) plus helper gestures: space, next, backspace; smoothing mirrors the desktop `final_pred` flow.
+- WebRTC media path with TURN/STUN env overrides; WebSocket signaling with HTTP polling fallback.
+- Gesture cheat sheet at `/tips`, live stats and latency sparkline in the call UI, and a standalone Tkinter interpreter for offline testing.
 
-## Roadmap (near future)
-- Replace alphabet-only model with a simple gesture vocabulary (yes/no/hello/thanks/help, etc.).
-- Lighter model export for edge devices; optional GPU build.
-- WebSocket signaling path as default (HTTP polling already present).
-- In-call accessibility additions (captions, audio read-out).
+## Project Layout
+- `camera_feed.py` — FastAPI app, auth, signaling, ASL inference pipeline.
+- `templates/home.html` — landing + role selector and demo creds.
+- `templates/login.html`, `templates/signup.html` — role-aware authentication screens.
+- `templates/in_call.html` — call surface with controls, transcript, and ASL toggle.
+- `templates/tips.html` — full gesture reference.
+- `static/css/style.css` — shared styling and motion assets.
+- `cnn8grps_rad1_model.h5` — trained alphabet classifier (required).
+- `signflow.db` — SQLite store created/updated on startup.
+- `simple_interpreter.py` — standalone Tkinter webcam interpreter demo.
+- `requirements.txt` — pinned dependencies (TensorFlow 2.13 on Python 3.10–3.11).
 
-## Tech Stack
-- FastAPI 0.103 + Starlette templates (Jinja2) and static assets.
-- WebRTC media with TURN fallback (openrelay.metered.ca) and HTTP signaling.
-- TensorFlow/Keras 2.13.1 + OpenCV + cvzone + MediaPipe for hand landmarking.
-- SQLite (`signflow.db`) for users/sessions; PBKDF2 (sha256) for password hashing.
+## Requirements
+- Python 3.10 or 3.11
+- Camera and microphone
+- ~2 GB free disk for TensorFlow + the model
 
-## Repository Layout
-- `camera_feed.py` - main FastAPI app, auth, signaling endpoints, and ASL inference pipeline.
-- `templates/` - Jinja2 views (`login.html`, `signup.html`, `in_call.html`).
-- `static/css/style.css` - UI styling for auth and call surfaces.
-- `cnn8grps_rad1_model.h5` - trained alphabet classifier (required at runtime).
-- `signflow.db` - SQLite store created/updated on startup.
-- `simple_interpreter.py` - standalone webcam interpreter demo.
-- `requirements.txt` - pinned dependencies.
-
-## Prerequisites
-- Python 3.10-3.11 (TensorFlow 2.13 wheels target these versions).
-- OS: Windows/macOS/Linux with a working camera and microphone.
-- pip, and roughly 2 GB free disk for TensorFlow plus the model weights.
-
-## Installation
+## Setup
 ```bash
 python -m venv venv
 .\venv\Scripts\activate      # Windows
@@ -46,47 +34,46 @@ python -m venv venv
 python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
-If TensorFlow fails to install on CPU-only machines, try `pip install tensorflow-cpu==2.13.1` (and keep `tensorflow-intel` pinned on Windows if available).
+If TensorFlow fails on CPU-only machines, try `pip install tensorflow-cpu==2.13.1` (keep `tensorflow-intel` on Windows if available).
 
-## Running the App
+## Run
 ```bash
 uvicorn camera_feed:app --reload --host 0.0.0.0 --port 8000
 ```
-- Open `http://localhost:8000` in two browser sessions (or one incognito window).
-- Sign in as:
-  - `primary` / `primary123` (acts as signer and runs inference).
-  - `secondary` / `secondary123` (viewer; receives text output).
-  - Or create new accounts via Sign up; only the `primary` user triggers predictions.
-- Allow camera/mic access. The primary user's hand will be sampled every ~200 ms.
+- Visit `http://localhost:8000/`, pick **Signer** or **Reader**, or jump straight to `/login`/`/signup`.
+- Demo accounts: `primary` / `primary123` (signer) and `secondary` / `secondary123` (reader).
+- Only the signer role sends frames to `/predict`; the reader receives video + transcript.
+- Allow camera/mic; detections run ~20 FPS and share current letter + sentence live.
 
-## Using Gestures
-- Letters: A-Z (model heuristics map hand landmarks to letters).
-- Controls:
-  - `next` gesture commits the last stable letter to the sentence builder.
-  - `Backspace` gesture deletes the last character.
-  - Closed-hand with pinky up -> space.
-- Live results are available at `/live_result` and pushed to the secondary UI.
+## Routes / API
+- `GET /` — landing + role chooser and demo creds.
+- `GET /login` — login (clears stale sessions); `GET /signup` — email/username/password + role.
+- `GET /call` — authenticated call UI (requires `session` cookie).
+- `GET /tips` — gesture cheat sheet.
+- `POST /signup` — create user; `POST /login` — authenticate; `POST /logout` — clear session.
+- `POST /predict` — auth required; accepts JPEG bytes or JSON `{ "image": "data:...base64" }`; returns `{"letter": "...", "sentence": "..."}`.
+- `GET /live_result` — latest detected letter/sentence for polling.
+- `POST /signal/send` / `GET /signal/recv` — HTTP signaling fallback.
+- `WS /ws/signaling` — WebSocket signaling (preferred when available).
+- `POST /reset_state` — clears prediction buffers (used on auth transitions).
 
-## API/Endpoint Reference
-- `GET /` - login page.
-- `GET /signup` - signup page.
-- `GET /call` - authenticated call UI (requires session cookie).
-- `POST /signup` - create user.
-- `POST /login` - authenticate user; issues `session` cookie.
-- `POST /logout` - clear session.
-- `POST /predict` - accepts base64 JPEG, returns `{"letter": "...", "sentence": "..."}` (auth required; only runs for username `primary`).
-- `POST /signal/send` / `GET /signal/recv` - HTTP signaling for WebRTC.
-- `GET /live_result` - latest detected letter/sentence for polling.
-- `WS /ws/signaling` - optional WebSocket signaling channel (not used by current UI).
+## Gestures Supported
+- Alphabet A–Z.
+- Controls: `next` commits the last stable letter; `Backspace` removes the last character; closed hand with slight pinky lift inserts a space. Full visuals live at `/tips`.
+
+## Configuration
+- `TURN_URLS`, `TURN_USER`, `TURN_PASS` — override TURN relays (defaults to openrelay.metered.ca).
+- `STUN_URLS` — override STUN servers (defaults to Google STUN).
+- Adjust `mirror_input`, `smoothing_window`, and other inference flags in `camera_feed.py` if you need different tracking behavior.
 
 ## Troubleshooting
-- If video is mirrored, set `mirror_input = True` in `camera_feed.py`.
-- Delete `signflow.db` to reset users/sessions (a new DB is created on next start).
-- Model file must stay in the project root or update the path in `camera_feed.py`.
-- Performance: ensure good lighting; keep hand within ~120-250 px diagonal for confident predictions.
+- If video appears flipped, toggle `mirror_input` in `camera_feed.py` (UI preview stays mirrored for comfort).
+- Delete `signflow.db` to reset users/sessions; it will be recreated on next start.
+- Keep the model file in the repo root or update the path in `camera_feed.py`.
+- For better confidence: good lighting and keep hand diagonal roughly 120–250 px.
 
-## Contributing / Next Steps
-1) Swap in the upcoming simple-gesture model and update `/predict` mapping.
-2) Add tests for auth/session flows and predict endpoint.
-3) Tune confidence thresholds and smoothing window (`smoothing_window` in `camera_feed.py`) for latency vs. stability.
-
+## Roadmap
+- Swap in a compact gesture vocabulary (yes/no/hello/thanks/help) alongside alphabet mode.
+- Export a lighter model for edge devices and optionally add a GPU build path.
+- Wire live stats/latency in the UI to real measurements instead of simulated pulses.
+- Add tests for auth/session flows and `/predict` smoothing behavior.

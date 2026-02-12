@@ -68,7 +68,7 @@ UPSCALE_SMALL_CROPS = False
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "signflow.db")
 SESSION_TTL_SECONDS = 60 * 60 * 12  # 12 hours
-session_user_cache: Dict[str, Tuple[int, str, int]] = {}
+session_user_cache: Dict[str, Tuple[int, str, str, int]] = {}
 def _db():
     return sqlite3.connect(DB_PATH, check_same_thread=False)
 
@@ -82,7 +82,8 @@ def _init_db():
             email TEXT UNIQUE,
             password_hash TEXT NOT NULL,
             salt TEXT NOT NULL,
-            created_at INTEGER NOT NULL
+            created_at INTEGER NOT NULL,
+            role TEXT NOT NULL DEFAULT 'secondary'
         )
     """)
     # Simple migration: add email column if DB was created before email support
@@ -91,14 +92,21 @@ def _init_db():
     if "email" not in cols:
         cur.execute("ALTER TABLE users ADD COLUMN email TEXT")
         cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email)")
+    if "role" not in cols:
+        cur.execute("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'secondary'")
     cur.execute("""
         CREATE TABLE IF NOT EXISTS sessions (
             token TEXT PRIMARY KEY,
             user_id INTEGER NOT NULL,
             expires_at INTEGER NOT NULL,
+            role TEXT NOT NULL DEFAULT 'secondary',
             FOREIGN KEY(user_id) REFERENCES users(id)
         )
     """)
+    cur.execute("PRAGMA table_info(sessions)")
+    sess_cols = [row[1] for row in cur.fetchall()]
+    if "role" not in sess_cols:
+        cur.execute("ALTER TABLE sessions ADD COLUMN role TEXT DEFAULT 'secondary'")
     conn.commit()
     conn.close()
 
@@ -111,19 +119,35 @@ def _verify_password(password: str, salt: str, stored_hash: str) -> bool:
     return hmac.compare_digest(test_hash, stored_hash)
 
 DEFAULT_ACCOUNTS = [
-    {"username": "primary", "email": "primary@example.com", "password": "primary123"},
-    {"username": "secondary", "email": "secondary@example.com", "password": "secondary123"},
+    {"username": "primary", "email": "primary@example.com", "password": "primary123", "role": "primary"},
+    {"username": "secondary", "email": "secondary@example.com", "password": "secondary123", "role": "secondary"},
 ]
+ALLOWED_ROLES = ("primary", "secondary")
 
-def _issue_session(user_id: int, username: Optional[str] = None) -> str:
+def _normalize_role(role: Optional[str], username: str = "") -> str:
+    """Validate role input and fall back to username-based defaults."""
+    r = (role or "").strip().lower()
+    if r in ALLOWED_ROLES:
+        return r
+    uname = (username or "").strip().lower()
+    if uname in ("primary", "secondary"):
+        return uname
+    return "secondary"
+
+def _issue_session(user_id: int, username: Optional[str] = None, role: Optional[str] = None) -> str:
     """Create a session token for the given user and persist it."""
     token = secrets.token_urlsafe(32)
     expires_at = int(time.time()) + SESSION_TTL_SECONDS
     conn = _db()
     cur = conn.cursor()
+    # Persist role so session survives server restarts with correct signaling role
+    if role is None:
+        cur.execute("SELECT role FROM users WHERE id = ?", (user_id,))
+        row = cur.fetchone()
+        role = _normalize_role(row[0] if row else None, username or "")
     cur.execute(
-        "INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, ?)",
-        (token, user_id, expires_at)
+        "INSERT INTO sessions (token, user_id, expires_at, role) VALUES (?, ?, ?, ?)",
+        (token, user_id, expires_at, role)
     )
     if username is None:
         cur.execute("SELECT username FROM users WHERE id = ?", (user_id,))
@@ -132,7 +156,7 @@ def _issue_session(user_id: int, username: Optional[str] = None) -> str:
     conn.commit()
     conn.close()
     if username:
-        session_user_cache[token] = (user_id, username, expires_at)
+        session_user_cache[token] = (user_id, username, role or "secondary", expires_at)
     return token
 
 def _drop_session(token: str, delete_db: bool = False):
@@ -152,14 +176,18 @@ def _seed_default_users():
     conn = _db()
     cur = conn.cursor()
     for acct in DEFAULT_ACCOUNTS:
-        cur.execute("SELECT id FROM users WHERE username = ?", (acct["username"],))
-        if cur.fetchone():
+        cur.execute("SELECT id, role FROM users WHERE username = ?", (acct["username"],))
+        row = cur.fetchone()
+        if row:
+            user_id, existing_role = row[0], row[1] if len(row) > 1 else None
+            if existing_role and existing_role != acct["role"]:
+                cur.execute("UPDATE users SET role = ? WHERE id = ?", (acct["role"], user_id))
             continue
         salt = secrets.token_hex(16)
         pw_hash = _hash_password(acct["password"], salt)
         cur.execute(
-            "INSERT INTO users (username, email, password_hash, salt, created_at) VALUES (?, ?, ?, ?, ?)",
-            (acct["username"], acct["email"], pw_hash, salt, int(time.time())),
+            "INSERT INTO users (username, email, password_hash, salt, created_at, role) VALUES (?, ?, ?, ?, ?, ?)",
+            (acct["username"], acct["email"], pw_hash, salt, int(time.time()), acct["role"]),
         )
     conn.commit()
     conn.close()
@@ -181,30 +209,33 @@ def _get_user_from_session(token: str):
     now = int(time.time())
     cached = session_user_cache.get(token)
     if cached:
-        cached_user_id, cached_username, cached_expires = cached
+        cached_user_id, cached_username, cached_role, cached_expires = cached
         if cached_expires >= now:
-            return (cached_user_id, cached_username)
+            return (cached_user_id, cached_username, cached_role)
         session_user_cache.pop(token, None)
 
     conn = _db()
     cur = conn.cursor()
-    cur.execute("SELECT user_id, expires_at FROM sessions WHERE token = ?", (token,))
+    cur.execute("SELECT user_id, expires_at, role FROM sessions WHERE token = ?", (token,))
     row = cur.fetchone()
     if not row:
         conn.close()
         return None
-    user_id, expires_at = row
+    user_id, expires_at, session_role = row
     if expires_at < now:
         cur.execute("DELETE FROM sessions WHERE token = ?", (token,))
         conn.commit()
         conn.close()
         return None
-    cur.execute("SELECT id, username FROM users WHERE id = ?", (user_id,))
+    cur.execute("SELECT id, username, role FROM users WHERE id = ?", (user_id,))
     user = cur.fetchone()
     conn.close()
     if user:
-        session_user_cache[token] = (user[0], user[1], expires_at)
-    return user
+        _, username, user_role = user
+        role = _normalize_role(session_role, username) or _normalize_role(user_role, username)
+        session_user_cache[token] = (user[0], username, role, expires_at)
+        return (user[0], username, role)
+    return None
 
 _init_db()
 _seed_default_users()
@@ -855,14 +886,14 @@ async def call(request: Request):
     user = _get_user_from_session(token)
     if not user:
         return RedirectResponse(url="/", status_code=302)
-    # Map arbitrary usernames to the two signaling roles expected by the client
-    role = "primary" if user[1].lower() == "primary" else "secondary"
+    user_id, username, role = user
+    role = _normalize_role(role, username)
     _reset_state()
     return templates.TemplateResponse(
         "in_call.html",
         {
             "request": request,
-            "username": user[1],
+            "username": username,
             "role": role,
             "turn_urls": TURN_URLS,
             "turn_user": TURN_USER,
@@ -876,6 +907,7 @@ async def signup(data: dict, response: Response):
     username = data.get("username", "").strip()
     email = data.get("email", "").strip().lower()
     password = data.get("password", "")
+    role = _normalize_role(data.get("role"), username)
     if not username or not password:
         raise HTTPException(status_code=400, detail="Username and password required.")
     if len(password) < 6:
@@ -899,13 +931,13 @@ async def signup(data: dict, response: Response):
     salt = secrets.token_hex(16)
     pw_hash = _hash_password(password, salt)
     cur.execute(
-        "INSERT INTO users (username, email, password_hash, salt, created_at) VALUES (?, ?, ?, ?, ?)",
-        (username, email or None, pw_hash, salt, int(time.time()))
+        "INSERT INTO users (username, email, password_hash, salt, created_at, role) VALUES (?, ?, ?, ?, ?, ?)",
+        (username, email or None, pw_hash, salt, int(time.time()), role)
     )
     user_id = cur.lastrowid
     conn.commit()
     conn.close()
-    token = _issue_session(user_id, username)
+    token = _issue_session(user_id, username, role)
     response.set_cookie("session", token, httponly=True, samesite="lax")
     return {"ok": True, "user_id": user_id}
 
@@ -913,12 +945,13 @@ async def signup(data: dict, response: Response):
 async def login(data: dict, request: Request, response: Response):
     username = data.get("username", "").strip()
     password = data.get("password", "")
+    requested_role = _normalize_role(data.get("role"), username)
     if not username or not password:
         raise HTTPException(status_code=400, detail="Username and password required.")
 
     conn = _db()
     cur = conn.cursor()
-    cur.execute("SELECT id, password_hash, salt FROM users WHERE username = ?", (username,))
+    cur.execute("SELECT id, password_hash, salt, role FROM users WHERE username = ?", (username,))
     row = cur.fetchone()
     if not row:
         # Clear any existing session if present
@@ -928,7 +961,7 @@ async def login(data: dict, request: Request, response: Response):
             _drop_session(token, delete_db=True)
             response.delete_cookie("session")
         raise HTTPException(status_code=401, detail="User not found. Please create an account.")
-    user_id, pw_hash, salt = row
+    user_id, pw_hash, salt, stored_role = row
     if not _verify_password(password, salt, pw_hash):
         token = request.cookies.get("session")
         conn.close()
@@ -938,7 +971,8 @@ async def login(data: dict, request: Request, response: Response):
         raise HTTPException(status_code=401, detail="Invalid credentials.")
 
     conn.close()
-    token = _issue_session(user_id, username)
+    session_role = requested_role or _normalize_role(stored_role, username)
+    token = _issue_session(user_id, username, session_role)
 
     response.set_cookie("session", token, httponly=True, samesite="lax")
     _reset_state()

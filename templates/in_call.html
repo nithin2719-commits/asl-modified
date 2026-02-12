@@ -153,9 +153,18 @@
                         <span class="btn-glow"></span>
                         Allow Camera &amp; Start
                     </button>
+                    <button type="button" class="ghost-link" id="switch-camera-btn">Switch camera</button>
                     <button type="button" class="help-toggle" id="permissions-help">
                         Need help unblocking?
                     </button>
+                </div>
+
+                <div class="device-picker" id="camera-picker" hidden>
+                    <label for="camera-select">Camera source</label>
+                    <div class="picker-row">
+                        <select id="camera-select"></select>
+                        <button type="button" id="camera-apply" class="btn-primary">Use camera</button>
+                    </div>
                 </div>
 
                 <div class="help-panel" id="help-panel" hidden>
@@ -192,6 +201,10 @@
         const startCameraBtn = document.getElementById('start-camera-btn');
         const helpToggle = document.getElementById('permissions-help');
         const helpPanel = document.getElementById('help-panel');
+        const cameraPicker = document.getElementById('camera-picker');
+        const cameraSelect = document.getElementById('camera-select');
+        const cameraApply = document.getElementById('camera-apply');
+        const switchCameraBtn = document.getElementById('switch-camera-btn');
         const miniBars = document.querySelectorAll('.mini-bars span');
         const telemetryBars = document.querySelectorAll('.telemetry-bars span');
         const liveLetter = document.getElementById('live-letter');
@@ -203,12 +216,15 @@
         const supportsE2EE = !!(RTCRtpSender && RTCRtpSender.prototype.createEncodedStreams);
         const statusDot = document.getElementById('call-status-dot');
         const statusText = document.getElementById('call-status-text');
+        const BLOCKED_CAM_KEYWORDS = ['phone', 'link', 'obs', 'virtual', 'droidcam', 'ndis', 'ipcam', 'm14'];
+        const PREFERRED_CAM_KEYWORDS = ['integrated', 'webcam', 'usb', 'hd', 'full', 'built'];
 
         let localKeyPair = null;
         let e2eeKey = null;
         let e2eeKeyPromiseResolve = null;
         const pendingSenders = new Set();
         let remotePubJwk = null;
+        let cachedVideoDevices = [];
 
         let callStartTime = Date.now();
         let timerInterval;
@@ -261,21 +277,141 @@
         }
 
         // Initialize camera
+        async function refreshCameraList() {
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                cachedVideoDevices = devices.filter(d => d.kind === 'videoinput');
+                if (cameraSelect) {
+                    cameraSelect.innerHTML = '';
+                    cachedVideoDevices.forEach((d, idx) => {
+                        const opt = document.createElement('option');
+                        opt.value = d.deviceId;
+                        opt.textContent = d.label || `Camera ${idx + 1}`;
+                        cameraSelect.appendChild(opt);
+                    });
+                    const saved = localStorage.getItem('signflowCameraId');
+                    const savedDev = cachedVideoDevices.find(d => d.deviceId === saved);
+                    // Auto-fix if saved camera is blocked/virtual
+                    const firstGood = cachedVideoDevices.find(d => !looksBlockedLabel(d.label));
+                    const firstPreferred = cachedVideoDevices.find(d => PREFERRED_CAM_KEYWORDS.some(k => (d.label || '').toLowerCase().includes(k))) || firstGood;
+                    if (savedDev && !looksBlockedLabel(savedDev.label)) {
+                        cameraSelect.value = savedDev.deviceId;
+                    } else if (firstPreferred) {
+                        cameraSelect.value = firstPreferred.deviceId;
+                        localStorage.setItem('signflowCameraId', firstPreferred.deviceId);
+                    } else if (cachedVideoDevices[0]) {
+                        cameraSelect.value = cachedVideoDevices[0].deviceId;
+                    }
+                    cameraPicker.hidden = cachedVideoDevices.length <= 1;
+                }
+            } catch (e) {
+                console.warn('enumerateDevices failed', e);
+            }
+        }
+
+        async function pickCameraDeviceId(preferUnblocked = true) {
+            if (!cachedVideoDevices.length) {
+                await refreshCameraList();
+            }
+            const selected = cameraSelect?.value;
+            if (selected && cachedVideoDevices.some(d => d.deviceId === selected)) {
+                return selected;
+            }
+            const saved = localStorage.getItem('signflowCameraId');
+            if (saved && cachedVideoDevices.some(d => d.deviceId === saved)) {
+                return saved;
+            }
+            const videos = [...cachedVideoDevices];
+            if (preferUnblocked) {
+                const preferred = videos.find(v => PREFERRED_CAM_KEYWORDS.some(k => (v.label || '').toLowerCase().includes(k))) ||
+                                  videos.find(v => !BLOCKED_CAM_KEYWORDS.some(k => (v.label || '').toLowerCase().includes(k)));
+                if (preferred) return preferred.deviceId;
+            }
+            return videos[0]?.deviceId || null;
+        }
+
+        function looksBlockedLabel(label = '') {
+            const l = label.toLowerCase();
+            return BLOCKED_CAM_KEYWORDS.some(k => l.includes(k));
+        }
+
+        function stopLocalStream() {
+            const stream = localVideo?.srcObject;
+            if (stream && stream.getTracks) {
+                stream.getTracks().forEach(t => t.stop());
+            }
+            localVideo.srcObject = null;
+        }
+
         async function initCamera() {
             try {
                 // Check if camera permission is already granted
                 const permissionStatus = await navigator.permissions.query({ name: 'camera' });
                 console.log('Camera permission status:', permissionStatus.state);
 
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: {
-                        width: { ideal: 640 },
-                        height: { ideal: 360 },
-                        frameRate: { ideal: 30, max: 30 },
-                        facingMode: 'user'
-                    },
+                const deviceId = await pickCameraDeviceId(true);
+                const attemptConstraints = [];
+                if (deviceId) {
+                    attemptConstraints.push({
+                        video: { deviceId: { exact: deviceId }, width: { ideal: 640 }, height: { ideal: 360 }, frameRate: { ideal: 30, max: 30 } },
+                        audio: true
+                    });
+                }
+                attemptConstraints.push({
+                    video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 360 }, frameRate: { ideal: 30, max: 30 } },
                     audio: true
                 });
+                attemptConstraints.push({
+                    video: true,
+                    audio: false
+                });
+
+                let stream = null;
+                let lastError = null;
+                stopLocalStream();
+                for (const c of attemptConstraints) {
+                    try {
+                        stream = await navigator.mediaDevices.getUserMedia(c);
+                        break;
+                    } catch (err) {
+                        lastError = err;
+                        console.warn('getUserMedia failed, trying next constraint', c, err);
+                    }
+                }
+                if (!stream) {
+                    throw lastError || new Error('Camera access failed');
+                }
+
+                // After first open, refresh list (labels now available) and switch off virtual cameras if needed
+                await refreshCameraList();
+                const currentTrack = stream.getVideoTracks()[0];
+                const currentLabel = currentTrack?.label || '';
+                const preferredId = await pickCameraDeviceId(true);
+                const preferredDev = cachedVideoDevices.find(d => d.deviceId === preferredId);
+                const shouldSwitch = (preferredDev && preferredId && preferredId !== currentTrack?.getSettings().deviceId) ||
+                    looksBlockedLabel(currentLabel);
+                if (shouldSwitch && preferredDev) {
+                    console.warn('Switching to preferred physical camera:', preferredDev.label);
+                    stream.getTracks().forEach(t => t.stop());
+                    stream = await navigator.mediaDevices.getUserMedia({
+                        video: { deviceId: { exact: preferredId }, width: { ideal: 640 }, height: { ideal: 360 }, frameRate: { ideal: 30, max: 30 } },
+                        audio: true
+                    });
+                }
+
+                const finalTrack = stream.getVideoTracks()[0];
+                const finalLabel = finalTrack?.label || '';
+                if (cameraSelect && finalLabel) {
+                    await refreshCameraList();
+                    const match = cachedVideoDevices.find(d => d.label === finalLabel) ||
+                                  cachedVideoDevices.find(d => d.deviceId === finalTrack?.getSettings().deviceId);
+                    if (match) {
+                        cameraSelect.value = match.deviceId;
+                        localStorage.setItem('signflowCameraId', match.deviceId);
+                    }
+                } else if (preferredId && preferredDev && !looksBlockedLabel(preferredDev.label)) {
+                    localStorage.setItem('signflowCameraId', preferredId);
+                }
 
                 localVideo.srcObject = stream;
                 cameraPrompt.classList.remove('visible');
@@ -286,7 +422,7 @@
                     aslOutput.textContent = 'Camera connected. Press Start ASL to begin interpreter.';
                     if (aslToggleBtn) aslToggleBtn.disabled = false;
                 } else {
-                    aslOutput.textContent = 'Viewer mode: ASL prediction off.';
+                    aslOutput.textContent = 'Viewer mode: camera on; ASL prediction stays off.';
                     if (aslToggleBtn) {
                         aslToggleBtn.disabled = true;
                         if (aslToggleLabel) aslToggleLabel.textContent = 'ASL Off';
@@ -302,7 +438,7 @@
                 } else if (error.name === 'NotFoundError') {
                     errorMessage += 'No camera found. Please connect a camera and refresh.';
                 } else if (error.name === 'NotReadableError') {
-                    errorMessage += 'Camera is already in use by another application.';
+                    errorMessage += 'Camera is already in use by another application. Close Phone Link / Teams / Zoom and retry.';
                 } else {
                     errorMessage += 'Please check camera permissions and try again.';
                 }
@@ -313,10 +449,34 @@
         }
 
         // Manual camera start button
-        startCameraBtn.addEventListener('click', () => {
-            aslOutput.textContent = 'Requesting camera access...';
-            initCamera();
-        });
+        if (startCameraBtn) {
+            startCameraBtn.addEventListener('click', () => {
+                aslOutput.textContent = 'Requesting camera access...';
+                initCamera();
+            });
+        }
+        if (switchCameraBtn) {
+            switchCameraBtn.addEventListener('click', async () => {
+                await refreshCameraList();
+                cameraPicker.hidden = cachedVideoDevices.length <= 1;
+                cameraPrompt.classList.add('visible');
+            });
+        }
+        if (cameraApply) {
+            cameraApply.addEventListener('click', () => {
+                const chosen = cameraSelect?.value;
+                if (chosen) {
+                    const selectedDev = cachedVideoDevices.find(d => d.deviceId === chosen);
+                    if (selectedDev && looksBlockedLabel(selectedDev.label)) {
+                        // force-unset if user accidentally picked a blocked virtual cam
+                        localStorage.removeItem('signflowCameraId');
+                    } else if (selectedDev) {
+                        localStorage.setItem('signflowCameraId', chosen);
+                    }
+                }
+                initCamera();
+            });
+        }
 
         if (helpToggle && helpPanel) {
             helpToggle.addEventListener('click', () => {
@@ -455,31 +615,35 @@
         }
 
         // Control buttons
-        muteBtn.addEventListener('click', () => {
-            const stream = localVideo.srcObject;
-            if (stream) {
-                const audioTrack = stream.getAudioTracks()[0];
-                audioTrack.enabled = !audioTrack.enabled;
-                isMuted = !isMuted;
-                muteBtn.classList.toggle('active', isMuted);
-                muteBtn.classList.toggle('pill-off', isMuted);
-                muteLabel.textContent = isMuted ? 'Unmute' : 'Mute';
-                muteIcon.className = isMuted ? 'fas fa-microphone-slash' : 'fas fa-microphone';
-            }
-        });
+        if (muteBtn) {
+            muteBtn.addEventListener('click', () => {
+                const stream = localVideo.srcObject;
+                if (stream) {
+                    const audioTrack = stream.getAudioTracks()[0];
+                    audioTrack.enabled = !audioTrack.enabled;
+                    isMuted = !isMuted;
+                    muteBtn.classList.toggle('active', isMuted);
+                    muteBtn.classList.toggle('pill-off', isMuted);
+                    muteLabel.textContent = isMuted ? 'Unmute' : 'Mute';
+                    muteIcon.className = isMuted ? 'fas fa-microphone-slash' : 'fas fa-microphone';
+                }
+            });
+        }
 
-        videoBtn.addEventListener('click', () => {
-            const stream = localVideo.srcObject;
-            if (stream) {
-                const videoTrack = stream.getVideoTracks()[0];
-                videoTrack.enabled = !videoTrack.enabled;
-                isVideoOff = !isVideoOff;
-                videoBtn.classList.toggle('active', isVideoOff);
-                videoBtn.classList.toggle('pill-off', isVideoOff);
-                videoLabel.textContent = isVideoOff ? 'Turn Video On' : 'Video';
-                videoIcon.className = isVideoOff ? 'fas fa-video-slash' : 'fas fa-video';
-            }
-        });
+        if (videoBtn) {
+            videoBtn.addEventListener('click', () => {
+                const stream = localVideo.srcObject;
+                if (stream) {
+                    const videoTrack = stream.getVideoTracks()[0];
+                    videoTrack.enabled = !videoTrack.enabled;
+                    isVideoOff = !isVideoOff;
+                    videoBtn.classList.toggle('active', isVideoOff);
+                    videoBtn.classList.toggle('pill-off', isVideoOff);
+                    videoLabel.textContent = isVideoOff ? 'Turn Video On' : 'Video';
+                    videoIcon.className = isVideoOff ? 'fas fa-video-slash' : 'fas fa-video';
+                }
+            });
+        }
 
         endCallBtn.addEventListener('click', () => {
             stopASLDetection();
@@ -500,10 +664,19 @@
             window.location.href = '/';
         });
 
-        // Initialize on page load - show camera prompt instead of auto-starting
+        // Initialize on page load
         window.addEventListener('load', () => {
             cameraPrompt.classList.add('visible');
-            aslOutput.textContent = 'Click "Allow Camera Access" to start ASL recognition.';
+            if (ROLE === 'primary') {
+                aslOutput.textContent = 'Click \"Allow Camera Access\" to start ASL recognition.';
+            } else {
+                aslOutput.textContent = 'Viewer mode: enable camera to join the call (ASL off).';
+                if (aslToggleBtn) {
+                    aslToggleBtn.disabled = true;
+                    if (aslToggleLabel) aslToggleLabel.textContent = 'ASL Off';
+                }
+            }
+            refreshCameraList();
         });
 
         // Animate tiny signal bars
@@ -572,14 +745,20 @@
                 setE2EEState('off', 'E2EE unavailable');
             }
 
-            // Send local tracks
-            stream.getTracks().forEach(track => {
-                const sender = pc.addTrack(track, stream);
-                if (supportsE2EE) {
-                    pendingSenders.add(sender);
-                    protectSender(sender);
-                }
-            });
+            if (stream) {
+                // Send local tracks for both roles
+                stream.getTracks().forEach(track => {
+                    const sender = pc.addTrack(track, stream);
+                    if (supportsE2EE) {
+                        pendingSenders.add(sender);
+                        protectSender(sender);
+                    }
+                });
+            } else {
+                // Fallback: declare recvonly if no local media available
+                pc.addTransceiver('video', { direction: 'recvonly' });
+                pc.addTransceiver('audio', { direction: 'recvonly' });
+            }
 
             // Remote track handler
             pc.addEventListener('track', (event) => {

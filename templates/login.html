@@ -195,7 +195,7 @@
                     const response = await fetch('/login', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ username, password })
+                        body: JSON.stringify({ username, password, role: roleField.value || 'primary' })
                     });
                     const isJson = response.headers.get('content-type')?.includes('application/json');
                 const result = isJson ? await response.json() : { detail: await response.text() };
