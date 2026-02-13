@@ -30,9 +30,6 @@
                     <i class="fas fa-hand-sparkles"></i>
                     <span>ASL engine</span>
                 </div>
-                <div class="mini-bars" aria-label="Signal quality">
-                    <span></span><span></span><span></span><span></span><span></span>
-                </div>
                 <div class="call-timer-pill">
                     <i class="fas fa-clock"></i>
                     <span id="call-timer">00:00:00</span>
@@ -205,7 +202,6 @@
         const cameraSelect = document.getElementById('camera-select');
         const cameraApply = document.getElementById('camera-apply');
         const switchCameraBtn = document.getElementById('switch-camera-btn');
-        const miniBars = document.querySelectorAll('.mini-bars span');
         const telemetryBars = document.querySelectorAll('.telemetry-bars span');
         const liveLetter = document.getElementById('live-letter');
         // Keep preview mirrored for the user, but send unmirrored frames so
@@ -226,7 +222,8 @@
         let remotePubJwk = null;
         let cachedVideoDevices = [];
 
-        let callStartTime = Date.now();
+        let callStartTime = null;
+        let timerStarted = false;
         let timerInterval;
         let isMuted = false;
         let isVideoOff = false;
@@ -267,6 +264,9 @@
 
         // Start call timer
         function startTimer() {
+            if (timerStarted) return;
+            timerStarted = true;
+            callStartTime = Date.now();
             timerInterval = setInterval(() => {
                 const elapsed = Date.now() - callStartTime;
                 const hours = Math.floor(elapsed / 3600000);
@@ -415,12 +415,12 @@
 
                 localVideo.srcObject = stream;
                 cameraPrompt.classList.remove('visible');
-                startTimer();
                 startSignaling(stream);
                 if (ROLE === 'primary') {
-                    setASLToggleState(false);
-                    aslOutput.textContent = 'Camera connected. Press Start ASL to begin interpreter.';
+                    setASLToggleState(true);
+                    aslOutput.textContent = 'ASL interpreter running...';
                     if (aslToggleBtn) aslToggleBtn.disabled = false;
+                    startASLDetection();
                 } else {
                     aslOutput.textContent = 'Viewer mode: camera on; ASL prediction stays off.';
                     if (aslToggleBtn) {
@@ -535,7 +535,7 @@
                     });
                     if (!blob) {
                         detectFailures += 1;
-                        return;
+                        throw new Error('blob_unavailable');
                     }
 
                     const controller = new AbortController();
@@ -570,6 +570,8 @@
                         liveLetter.textContent = result.letter;
                         flash(aslOutput);
                         flash(liveLetter);
+                    } else {
+                        liveLetter.textContent = 'Listening...';
                     }
                     if (typeof result.sentence === 'string') {
                         aslSentence.textContent = `Sentence: ${result.sentence}`;
@@ -581,8 +583,7 @@
                     }
                     if (detectFailures >= MAX_DETECT_FAILURES) {
                         detectFailures = 0;
-                        aslOutput.textContent = 'Reconnecting ASL tracker...';
-                        fetch('/reset_state', { method: 'POST' }).catch(() => {});
+                        aslOutput.textContent = 'ASL interpreter running... reconnecting';
                     }
                 } finally {
                     scheduleNext();
@@ -651,6 +652,7 @@
                 localVideo.srcObject.getTracks().forEach(track => track.stop());
             }
             clearInterval(timerInterval);
+            timerStarted = false;
             window.location.href = '/';
         });
 
@@ -668,7 +670,7 @@
         window.addEventListener('load', () => {
             cameraPrompt.classList.add('visible');
             if (ROLE === 'primary') {
-                aslOutput.textContent = 'Click \"Allow Camera Access\" to start ASL recognition.';
+                aslOutput.textContent = 'Requesting camera access...';
             } else {
                 aslOutput.textContent = 'Viewer mode: enable camera to join the call (ASL off).';
                 if (aslToggleBtn) {
@@ -677,6 +679,7 @@
                 }
             }
             refreshCameraList();
+            initCamera();
         });
 
         // Animate tiny signal bars
@@ -688,7 +691,6 @@
                 bar.style.transitionDelay = `${idx * 40}ms`;
             });
         }
-        setInterval(() => animateBars(miniBars), 900);
         setInterval(() => animateBars(telemetryBars), 1100);
 
         // ------------------ WebRTC Signaling ------------------
@@ -730,6 +732,7 @@
                     setCallStatus('Connecting…', 'connecting');
                 } else if (pc.connectionState === 'connected') {
                     setCallStatus('Connected', 'connected');
+                    startTimer();
                 }
             });
 
@@ -772,6 +775,7 @@
                         protectReceiver(event.receiver);
                     }
                     setCallStatus('Connected', 'connected');
+                    startTimer();
                 }
                 if (remotePeerVideo.paused) {
                     remotePeerVideo.play().catch(() => {});

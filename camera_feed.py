@@ -328,6 +328,10 @@ async def signal_recv(role: str):
 
 # Global state for final_pred-style sentence assembly
 smoothing_window = 3
+NEXT_CONFIRM_FRAMES = 2
+BACKSPACE_CONFIRM_FRAMES = 2
+SPACE_CONFIRM_FRAMES = 3
+CONTROL_COOLDOWN_FRAMES = 6
 
 # Global text state
 sentence = " "
@@ -337,15 +341,26 @@ ten_prev_char = [" "] * 10
 
 # Shared last detection result for secondary display
 last_result = {"letter": "", "sentence": "", "ts": 0}
+next_hold_frames = 0
+backspace_hold_frames = 0
+space_hold_frames = 0
+control_cooldown_frames = 0
+control_latch = ""
 
 def _reset_state():
     """Clear prediction buffers so stale letters don't persist across restarts/logouts."""
     global sentence, prev_char, count, ten_prev_char, last_result
+    global next_hold_frames, backspace_hold_frames, space_hold_frames, control_cooldown_frames, control_latch
     sentence = " "
     prev_char = ""
     count = -1
     ten_prev_char = [" "] * 10
     last_result = {"letter": "", "sentence": "", "ts": int(time.time() * 1000)}
+    next_hold_frames = 0
+    backspace_hold_frames = 0
+    space_hold_frames = 0
+    control_cooldown_frames = 0
+    control_latch = ""
 
 _reset_state()
 
@@ -408,6 +423,13 @@ def _is_next_gesture_strict(pts) -> bool:
 
     return folded_votes >= 3 and thumb_inside_palm and thumb_not_above
 
+def _is_next_gesture_fallback(pts) -> bool:
+    """Fallback NEXT heuristic kept close to original behavior for compatibility."""
+    return (
+        (pts[4][0] < pts[5][0]) and
+        (pts[6][1] > pts[8][1] and pts[10][1] > pts[12][1] and pts[14][1] > pts[16][1] and pts[18][1] > pts[20][1])
+    )
+
 def _is_backspace_gesture(pts) -> bool:
     """
     Direct geometric backspace gesture check (independent of model class label).
@@ -415,14 +437,59 @@ def _is_backspace_gesture(pts) -> bool:
     diag = _hand_diag(pts)
     if diag < 70:
         return False
-    return (
-        pts[0][0] > pts[8][0] and pts[0][0] > pts[12][0] and pts[0][0] > pts[16][0] and pts[0][0] > pts[20][0] and
-        pts[4][1] < pts[8][1] and pts[4][1] < pts[12][1] and pts[4][1] < pts[16][1] and pts[4][1] < pts[20][1] and
-        pts[4][1] < pts[6][1] and pts[4][1] < pts[10][1] and pts[4][1] < pts[14][1] and pts[4][1] < pts[18][1]
+
+    margin = max(4, int(diag * 0.03))
+    fingers_extended = (
+        pts[8][1] < pts[6][1] - margin and
+        pts[12][1] < pts[10][1] - margin and
+        pts[16][1] < pts[14][1] - margin and
+        pts[20][1] < pts[18][1] - margin
     )
+    if not fingers_extended:
+        return False
+
+    spread = distance(pts[8], pts[12]) + distance(pts[12], pts[16]) + distance(pts[16], pts[20])
+    if spread < diag * 0.50:
+        return False
+
+    palm_x_min = min(pts[5][0], pts[9][0], pts[13][0], pts[17][0])
+    palm_x_max = max(pts[5][0], pts[9][0], pts[13][0], pts[17][0])
+    thumb_outside = (pts[4][0] < palm_x_min - margin) or (pts[4][0] > palm_x_max + margin)
+    thumb_above_index_knuckle = pts[4][1] < pts[6][1] + margin
+
+    return thumb_outside or thumb_above_index_knuckle
+
+
+def _is_space_gesture(pts) -> bool:
+    """Open-palm space gesture: all fingers extended, thumb near palm, clear hand size."""
+    diag = _hand_diag(pts)
+    if diag < 70:
+        return False
+
+    margin = max(6, int(diag * 0.04))
+    fingers_extended = (
+        pts[8][1] < pts[6][1] - margin and
+        pts[12][1] < pts[10][1] - margin and
+        pts[16][1] < pts[14][1] - margin and
+        pts[20][1] < pts[18][1] - margin
+    )
+    if not fingers_extended:
+        return False
+
+    palm_x_min = min(pts[5][0], pts[9][0], pts[13][0], pts[17][0])
+    palm_x_max = max(pts[5][0], pts[9][0], pts[13][0], pts[17][0])
+    thumb_inside = palm_x_min - margin <= pts[4][0] <= palm_x_max + margin
+
+    spread = distance(pts[8], pts[12]) + distance(pts[12], pts[16]) + distance(pts[16], pts[20])
+    sufficient_spread = spread > diag * 0.55
+
+    return thumb_inside and sufficient_spread
 
 def _update_sentence(ch):
     global sentence, prev_char, count, ten_prev_char
+
+    if ch == "":
+        return
     # Keep sentence behavior aligned with the desktop final_pred.py flow.
     if ch == "next" and prev_char != "next":
         prior = ten_prev_char[(count - 2) % 10]
@@ -442,6 +509,57 @@ def _update_sentence(ch):
     prev_char = ch
     count += 1
     ten_prev_char[count % 10] = ch
+
+def _stabilize_control_output(ch: str) -> str:
+    global next_hold_frames, backspace_hold_frames, space_hold_frames, control_cooldown_frames, control_latch
+
+    if control_cooldown_frames > 0:
+        control_cooldown_frames -= 1
+
+    if ch == "next":
+        backspace_hold_frames = 0
+        space_hold_frames = 0
+        if control_latch == "next":
+            return ""
+        next_hold_frames += 1
+        if control_cooldown_frames > 0 or next_hold_frames < NEXT_CONFIRM_FRAMES:
+            return ""
+        next_hold_frames = 0
+        control_cooldown_frames = CONTROL_COOLDOWN_FRAMES
+        control_latch = "next"
+        return "next"
+
+    if ch == "Backspace":
+        next_hold_frames = 0
+        space_hold_frames = 0
+        if control_latch == "Backspace":
+            return ""
+        backspace_hold_frames += 1
+        if control_cooldown_frames > 0 or backspace_hold_frames < BACKSPACE_CONFIRM_FRAMES:
+            return ""
+        backspace_hold_frames = 0
+        control_cooldown_frames = CONTROL_COOLDOWN_FRAMES
+        control_latch = "Backspace"
+        return "Backspace"
+
+    if ch == "  ":
+        next_hold_frames = 0
+        backspace_hold_frames = 0
+        if control_latch == "  ":
+            return ""
+        space_hold_frames += 1
+        if control_cooldown_frames > 0 or space_hold_frames < SPACE_CONFIRM_FRAMES:
+            return ""
+        space_hold_frames = 0
+        control_cooldown_frames = CONTROL_COOLDOWN_FRAMES
+        control_latch = "  "
+        return "  "
+
+    next_hold_frames = 0
+    backspace_hold_frames = 0
+    space_hold_frames = 0
+    control_latch = ""
+    return ch
 
 def predict(test_image, pts):
     global last_result
@@ -755,13 +873,15 @@ def predict(test_image, pts):
         if (pts[6][1] > pts[8][1] and pts[10][1] < pts[12][1] and pts[14][1] < pts[16][1] and pts[18][1] > pts[20][1]):
             ch1 = " "
 
-    # Keep "next" rule aligned with final_pred.py behavior.
-    if ch1 in ['E', 'Y', 'B']:
-        if (pts[4][0] < pts[5][0]) and (pts[6][1] > pts[8][1] and pts[10][1] > pts[12][1] and pts[14][1] > pts[16][1] and pts[18][1] > pts[20][1]):
-            ch1 = "next"
+    # Prefer explicit gesture geometry for NEXT (more reliable than class-only path).
+    if _is_next_gesture_strict(pts) or _is_next_gesture_fallback(pts):
+        ch1 = "next"
 
     if _is_backspace_gesture(pts):
         ch1 = 'Backspace'
+
+    if _is_space_gesture(pts):
+        ch1 = '  '
 
     # Do not emit raw class-group integers (0..7) to UI/sentence.
     if _is_letter_symbol(ch1):
@@ -770,6 +890,8 @@ def predict(test_image, pts):
         ch1 = "  "
     elif ch1 not in ("next", "Backspace", "  "):
         ch1 = ""
+
+    ch1 = _stabilize_control_output(ch1)
 
     # Match desktop interpreter print behavior (ten_prev_char + next gesture).
     _update_sentence(ch1)
