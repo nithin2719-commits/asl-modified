@@ -293,27 +293,6 @@
             });
         });
 
-        if (loginGoogle) {
-            loginGoogle.addEventListener('click', () => {
-                if (!googleEnabled) {
-                    loginHint.textContent = 'Google sign-in is not configured. Please use username/password.';
-                    loginHint.classList.add('show');
-                    return;
-                }
-                window.location.href = '/auth/google?flow=login&next=/call';
-            });
-        }
-        if (loginGithub) {
-            loginGithub.addEventListener('click', () => {
-                if (!githubEnabled) {
-                    loginHint.textContent = 'GitHub sign-in is not configured. Please use username/password.';
-                    loginHint.classList.add('show');
-                    return;
-                }
-                window.location.href = '/auth/github?flow=login&next=/call';
-            });
-        }
-
         // Animated background effects
         document.addEventListener('mousemove', (e) => {
             const shapes = document.querySelectorAll('.shape');
