@@ -1,6 +1,50 @@
-# SignFlow - ASL Video Call & Interpreter
+<div align="center">
 
-Updated February 11, 2026 — SignFlow is a FastAPI + WebRTC app that turns a two‑party video call into a live ASL interpreter. The signer runs on-device inference; the reader sees a synced transcript and video feed.
+<img src="assets/banner.png" alt="SignFlow Call — an ASL interpreter for two-person video calls" width="100%">
+
+<br>
+
+[![fastapi](https://img.shields.io/badge/FastAPI-backend-0b2236?style=flat-square&logo=fastapi&logoColor=white)](camera_feed.py)
+[![webrtc](https://img.shields.io/badge/WebRTC-video%20call-0b2236?style=flat-square&logo=webrtc&logoColor=white)](templates/in_call.html)
+[![keras](https://img.shields.io/badge/Keras-CNN-0b2236?style=flat-square&logo=keras&logoColor=white)](cnn8grps_rad1_model.h5)
+[![python](https://img.shields.io/badge/Python-3.10%20%7C%203.11-0b2236?style=flat-square&logo=python&logoColor=white)](requirements.txt)
+
+**A FastAPI + WebRTC app that turns a two-person video call into a live ASL interpreter.**
+The signer's camera is read as ASL letters on their side; the reader sees the video and a synced transcript.
+
+[Screenshots](#screenshots) · [Highlights](#highlights) · [Setup](#setup) · [Run](#run) · [API](#routes--api) · [Gestures](#gestures-supported)
+
+</div>
+
+---
+
+## Screenshots
+
+<img src="assets/call-reader.png" alt="Reader's view of a connected call: the signer's hand fills the frame and the interpreter panel shows Detected: B" width="100%">
+
+<p align="center"><sub><b>Reader's view of a live call.</b> The signer's video arrives over WebRTC and the interpreter panel shows the letter detected on the signer's side.</sub></p>
+
+<table>
+<tr>
+<td width="50%"><img src="assets/call-signer.png" alt="Signer's view: own camera in the corner, interpreter reading B"></td>
+<td width="50%"><img src="assets/home.png" alt="Landing page with signer and reader lanes and demo credentials"></td>
+</tr>
+<tr>
+<td align="center"><sub><b>Signer's view.</b> Frames go to <code>/predict</code>; the result is shared with the reader.</sub></td>
+<td align="center"><sub><b>Landing page.</b> Pick a lane; demo credentials copy with a click.</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src="assets/login.png" alt="Role-aware login"></td>
+<td width="50%"><img src="assets/tips.png" alt="Gesture cheat sheet for A to Z plus space, backspace and next"></td>
+</tr>
+<tr>
+<td align="center"><sub><b>Role-aware login.</b> Signer (camera + mic) or reader (transcript).</sub></td>
+<td align="center"><sub><b>Gesture tips.</b> Every letter and control gesture at <code>/tips</code>.</sub></td>
+</tr>
+</table>
+
+<sub>The two call screenshots come from a real call between two browser sessions on one machine. The signer's
+webcam was a still image from a public ASL alphabet dataset fed through Chromium's fake camera.</sub>
 
 ## Highlights
 - New animated landing page at `/` with role selector and copy-to-clipboard demo credentials.
@@ -17,9 +61,9 @@ Updated February 11, 2026 — SignFlow is a FastAPI + WebRTC app that turns a tw
 - `templates/tips.html` — full gesture reference.
 - `static/css/style.css` — shared styling and motion assets.
 - `cnn8grps_rad1_model.h5` — trained alphabet classifier (required).
-- `signflow.db` — SQLite store created/updated on startup.
+- `signflow.db` — SQLite store created and seeded on startup (git-ignored).
 - `simple_interpreter.py` — standalone Tkinter webcam interpreter demo.
-- `requirements.txt` — pinned dependencies (TensorFlow 2.13 on Python 3.10–3.11).
+- `requirements.txt` — pinned dependencies (TensorFlow 2.13 on Python 3.10–3.11; Windows-only packages are gated by platform markers).
 
 ## Requirements
 - Python 3.10 or 3.11
@@ -34,14 +78,14 @@ python -m venv venv
 python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
-If TensorFlow fails on CPU-only machines, try `pip install tensorflow-cpu==2.13.1` (keep `tensorflow-intel` on Windows if available).
+If TensorFlow fails on CPU-only machines, try `pip install tensorflow-cpu==2.13.1`.
 
 ## Run
 ```bash
 uvicorn camera_feed:app --reload --host 0.0.0.0 --port 8000
 ```
 - Visit `http://localhost:8000/`, pick **Signer** or **Reader**, or jump straight to `/login`/`/signup`.
-- Demo accounts: `primary` / `primary123` (signer) and `secondary` / `secondary123` (reader).
+- Demo accounts: `primary` / `primary123` (signer) and `secondary` / `secondary123` (reader). Pick the matching **Signer** or **Reader** chip on the login page; the session takes the role you pick.
 - Only the signer role sends frames to `/predict`; the reader receives video + transcript.
 - Allow camera/mic; detections run ~20 FPS and share current letter + sentence live.
 
